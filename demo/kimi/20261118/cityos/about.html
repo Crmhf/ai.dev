@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>系统说明 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .doc h3 { font-size: 15px; margin: 20px 0 10px; letter-spacing: 1px; }
+  .doc h3:first-child { margin-top: 0; }
+  .doc p { color: var(--text-mid); font-size: 13px; line-height: 1.9; }
+  .doc ul { color: var(--text-mid); font-size: 13px; line-height: 2; padding-left: 20px; }
+  .doc code {
+    font-family: var(--mono); font-size: 12px;
+    background: rgba(79, 195, 247, 0.1); border: 1px solid var(--border);
+    border-radius: 5px; padding: 1px 7px; color: var(--accent);
+  }
+  .doc pre {
+    font-family: var(--mono); font-size: 12px; line-height: 1.8;
+    background: rgba(5, 8, 15, 0.8); border: 1px solid var(--border);
+    border-radius: var(--radius-s); padding: 14px 16px; overflow-x: auto;
+    color: var(--text-mid); margin: 10px 0;
+  }
+  .arch { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+  .arch .layer {
+    border: 1px solid var(--border-strong); border-radius: var(--radius-s);
+    padding: 12px; text-align: center; font-size: 12px; color: var(--text-mid);
+    background: rgba(79, 195, 247, 0.05);
+  }
+  .arch .layer b { display: block; color: var(--text-hi); margin-bottom: 5px; font-size: 13px; }
+  @media (max-width: 900px) { .arch { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>系统说明</h2>
+        <span class="desc">架构 · 数据 · 运行方式</span>
+        <div class="actions"><a class="btn sm" href="index.html">← 返回总览</a></div>
+      </div>
+
+      <div class="grid g-21">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">关于 CityOS</span></div>
+          <div class="p-body doc">
+            <h3>项目简介</h3>
+            <p>梅塔维尔 CityOS（City Operation System）是一套<b>纯静态</b>的城市运行管理中心演示系统，围绕虚拟城市「梅塔维尔」构建，覆盖态势总览、3D 城市沙盘、交通运行、能源碳排、应急指挥、数据分析六大业务模块。系统无需后端服务，所有数据由内置的确定性模拟数据层实时生成，刷新页面数据保持一致。</p>
+
+            <h3>技术架构</h3>
+            <div class="arch">
+              <div class="layer"><b>感知层</b>12,847 路物联设备<br/>（模拟）</div>
+              <div class="layer"><b>数据层</b>data.js 种子随机<br/>确定性生成</div>
+              <div class="layer"><b>服务层</b>纯静态托管<br/>无后端依赖</div>
+              <div class="layer"><b>应用层</b>六大业务页面<br/>统一设计系统</div>
+            </div>
+            <ul>
+              <li>渲染引擎：<code>Three.js r160</code>（3D 沙盘）· <code>ECharts 5.5</code>（数据可视化）</li>
+              <li>设计系统：<code>assets/css/main.css</code> —— 设计令牌 + 组件库（面板 / KPI / 表格 / 标签 / 进度条）</li>
+              <li>公共层：<code>assets/js/common.js</code> —— 页面外壳、时钟、图表主题、CSV 导出、数字动画</li>
+              <li>数据层：<code>assets/js/data.js</code> —— mulberry32 种子随机，含六区、十路、建筑、事件、传感器数据集</li>
+            </ul>
+
+            <h3>页面清单</h3>
+            <ul>
+              <li><code>index.html</code> 态势总览 —— KPI、24h 城市脉搏、城区对比、事件流</li>
+              <li><code>sandbox.html</code> 3D 城市沙盘 —— 程序化地形、建筑群、车流、昼夜循环</li>
+              <li><code>traffic.html</code> 交通运行 —— 流量车速、拥堵热力、轨道、停车</li>
+              <li><code>energy.html</code> 能源与碳排 —— 负荷曲线、供电结构、储能、双碳目标</li>
+              <li><code>emergency.html</code> 应急指挥 —— 事件接报、资源待命、演练计划</li>
+              <li><code>data.html</code> 数据分析 —— 相关性分析、雷达对比、数据检索导出</li>
+            </ul>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <div class="p-head"><span class="p-title">本地运行</span></div>
+            <div class="p-body doc">
+              <p>站点使用 ES Module 与 CDN 依赖，请通过静态服务器访问：</p>
+              <pre>cd demo/kimi/20261118/cityos
+python3 -m http.server 8080
+# 打开 http://localhost:8080</pre>
+              <p>也可使用 <code>npx serve .</code>。直接双击 <code>index.html</code> 时总览等页面可打开，但 3D 沙盘页的模块脚本在部分浏览器下受 file:// 限制。</p>
+            </div>
+          </div>
+          <div class="panel mt">
+            <div class="p-head"><span class="p-title">版本信息</span></div>
+            <div class="p-body">
+              <table class="tbl">
+                <tbody>
+                  <tr><td class="dim">版本</td><td class="mono">v2.4.1</td></tr>
+                  <tr><td class="dim">构建日期</td><td class="mono">2026-11-18</td></tr>
+                  <tr><td class="dim">许可</td><td>MIT（随仓库 LICENSE）</td></tr>
+                  <tr><td class="dim">数据声明</td><td class="dim">全部为程序生成的模拟数据，不对应任何真实城市</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script>CityOS.mount('about');</script>
+</body>
+</html>

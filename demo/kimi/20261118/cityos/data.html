@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>数据分析 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .filter-bar select, .filter-bar input {
+    font-family: var(--font); font-size: 12.5px; color: var(--text-hi);
+    background: rgba(30, 50, 80, 0.5); border: 1px solid var(--border-strong);
+    border-radius: 999px; padding: 6px 14px; outline: none;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
+  .filter-bar option { background: var(--bg-panel-solid); }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  th.sortable .arrow { font-size: 9px; margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>数据分析</h2>
+        <span class="desc">感知数据检索 · 交叉分析 · 导出</span>
+        <div class="actions">
+          <button class="btn sm" id="btn-csv">⬇ 导出 CSV</button>
+          <button class="btn sm" onclick="window.print()">🖨 打印报表</button>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <!-- 交叉分析 -->
+      <div class="grid g-2">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">车流 × 能耗 相关性</span><span class="p-extra">24h 逐时</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-scatter"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">城区多维对比</span><span class="p-extra">雷达图</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-radar"></div></div>
+        </div>
+      </div>
+
+      <!-- 传感器数据表 -->
+      <div class="panel mt">
+        <div class="p-head">
+          <span class="p-title">感知设备数据</span>
+          <div class="p-extra filter-bar">
+            <select id="f-kind"><option value="">全部类型</option></select>
+            <select id="f-district"><option value="">全部城区</option></select>
+            <select id="f-status"><option value="">全部状态</option><option>在线</option><option>离线</option></select>
+            <input id="f-q" type="search" placeholder="搜索编号 / 道路…" style="width:170px" />
+          </div>
+        </div>
+        <div class="p-body flush tbl-wrap" style="max-height:440px">
+          <table class="tbl" id="tbl-sensor">
+            <thead><tr>
+              <th class="sortable" data-k="id">编号</th>
+              <th class="sortable" data-k="kind">类型</th>
+              <th class="sortable" data-k="district">城区</th>
+              <th>位置</th>
+              <th class="sortable num" data-k="value">读数 <span class="arrow"></span></th>
+              <th>状态</th><th>更新</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="p-head" style="border-top:1px solid var(--border);border-bottom:none">
+          <span class="dim" style="font-size:11px" id="tbl-count">--</span>
+          <div class="p-extra">
+            <button class="btn sm" id="pg-prev">‹ 上一页</button>
+            <span class="mono dim" style="font-size:11px;margin:0 8px" id="pg-info">1 / 1</span>
+            <button class="btn sm" id="pg-next">下一页 ›</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+CityOS.mount('data');
+const D = CITY_DATA, H = CityOS;
+
+/* ---------- 散点：车流 × 能耗 ---------- */
+{
+  const pts = D.traffic.flow24h.map((f, h) => [f, D.energy.load24h[h], h]);
+  // 简单线性回归
+  const n = pts.length;
+  const sx = pts.reduce((a, p) => a + p[0], 0), sy = pts.reduce((a, p) => a + p[1], 0);
+  const sxy = pts.reduce((a, p) => a + p[0] * p[1], 0), sxx = pts.reduce((a, p) => a + p[0] * p[0], 0);
+  const k = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+  const b = (sy - k * sx) / n;
+  const xs = pts.map(p => p[0]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const r = (n * sxy - sx * sy) / Math.sqrt((n * sxx - sx * sx) * (n * pts.reduce((a, p) => a + p[1] * p[1], 0) - sy * sy));
+
+  H.makeChart(H.$('#ch-scatter'), {
+    tooltip: { formatter: p => p.seriesName === '回归线'
+      ? `拟合 y = ${k.toFixed(3)}x + ${b.toFixed(1)}`
+      : `${p.value[2]}:00<br/>车流 ${H.fmt(p.value[0])} 辆/h<br/>负荷 ${p.value[1]} MW` },
+    xAxis: { type: 'value', name: '车流 辆/h', scale: true },
+    yAxis: { type: 'value', name: '负荷 MW', scale: true },
+    series: [
+      { name: '逐时样本', type: 'scatter', data: pts, symbolSize: 9,
+        itemStyle: { color: '#4fc3f7', opacity: 0.75 } },
+      { name: '回归线', type: 'line', showSymbol: false, silent: true,
+        data: [[minX, k * minX + b], [maxX, k * maxX + b]],
+        lineStyle: { color: '#f87171', width: 2, type: 'dashed' } },
+    ],
+  });
+  const panel = H.$('#ch-scatter').closest('.panel');
+  panel.querySelector('.p-extra').textContent = `24h 逐时 · 相关系数 r = ${r.toFixed(3)}`;
+}
+
+/* ---------- 雷达：城区多维对比 ---------- */
+{
+  const rnd = D._util.rand;
+  const maxes = { pop: 45, gdp: 3.2, green: 50, transit: 100, safe: 100 };
+  const dims = [
+    { name: '人口规模', max: 100 },
+    { name: '经济活力', max: 100 },
+    { name: '绿化覆盖', max: 100 },
+    { name: '交通便利', max: 100 },
+    { name: '治安评分', max: 100 },
+  ];
+  const seriesData = D.DISTRICTS.map((d, i) => ({
+    name: d.name,
+    value: [
+      Math.round(d.pop / maxes.pop * 100),
+      Math.round((d.id === 'cbd' ? 3.1 : 0.8 + rnd() * 1.8) / maxes.gdp * 100),
+      Math.round(d.id === 'hillside' ? 92 : 20 + rnd() * 40),
+      Math.round(d.id === 'cbd' ? 95 : 45 + rnd() * 45),
+      Math.round(72 + rnd() * 26),
+    ],
+    lineStyle: { width: 2 },
+    areaStyle: { opacity: 0.06 },
+  }));
+  H.makeChart(H.$('#ch-radar'), {
+    tooltip: { trigger: 'item' },
+    legend: { show: true, bottom: 0, top: 'auto' },
+    radar: {
+      indicator: dims, radius: '62%', center: ['50%', '48%'],
+      axisName: { color: '#a9bcd8', fontSize: 11 },
+      splitLine: { lineStyle: { color: 'rgba(120,180,255,0.15)' } },
+      splitArea: { areaStyle: { color: ['transparent', 'rgba(120,180,255,0.03)'] } },
+      axisLine: { lineStyle: { color: 'rgba(120,180,255,0.2)' } },
+    },
+    series: [{ type: 'radar', data: seriesData }],
+  });
+}
+
+/* ---------- 传感器表：筛选 + 排序 + 分页 + 导出 ---------- */
+const PAGE = 15;
+let page = 1, sortKey = 'id', sortDir = 1;
+
+// 填充筛选器
+{
+  const kinds = [...new Set(D.sensors.map(s => s.kind))];
+  kinds.forEach(k => H.$('#f-kind').insertAdjacentHTML('beforeend', `<option>${k}</option>`));
+  D.DISTRICTS.forEach(d => H.$('#f-district').insertAdjacentHTML('beforeend', `<option>${d.name}</option>`));
+}
+function filtered() {
+  const k = H.$('#f-kind').value, dt = H.$('#f-district').value,
+        st = H.$('#f-status').value, q = H.$('#f-q').value.trim().toLowerCase();
+  return D.sensors.filter(s =>
+    (!k || s.kind === k) && (!dt || s.district === dt) && (!st || s.status === st) &&
+    (!q || s.id.toLowerCase().includes(q) || s.road.toLowerCase().includes(q)));
+}
+function render() {
+  const list = filtered().sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    return (typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'zh')) * sortDir;
+  });
+  const pages = Math.max(1, Math.ceil(list.length / PAGE));
+  page = Math.min(page, pages);
+  const slice = list.slice((page - 1) * PAGE, page * PAGE);
+  const tb = H.$('#tbl-sensor tbody');
+  tb.innerHTML = '';
+  slice.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono dim">${s.id}</td>
+      <td>${H.tag(s.kind, { 流量: 'info', 环境: 'ok', 能耗: 'warn', 水位: 'info', 结构: 'mute' }[s.kind])}</td>
+      <td>${s.district}</td><td class="dim">${s.road}</td>
+      <td class="num">${s.value} ${s.unit}</td>
+      <td><span class="dot ${s.status === '在线' ? 'ok' : 'danger'}"></span>${s.status}</td>
+      <td class="dim">${s.updated}</td>`;
+    tb.appendChild(tr);
+  });
+  if (!slice.length) tb.innerHTML = '<tr><td colspan="7"><div class="empty">没有符合条件的数据</div></td></tr>';
+  H.$('#tbl-count').textContent = `共 ${list.length} 条 · 每页 ${PAGE} 条`;
+  H.$('#pg-info').textContent = `${page} / ${pages}`;
+}
+['f-kind', 'f-district', 'f-status'].forEach(id => H.$('#' + id).addEventListener('change', () => { page = 1; render(); }));
+H.$('#f-q').addEventListener('input', () => { page = 1; render(); });
+H.$('#pg-prev').addEventListener('click', () => { if (page > 1) { page--; render(); } });
+H.$('#pg-next').addEventListener('click', () => { page++; render(); });
+H.$$('#tbl-sensor th.sortable').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; }
+  H.$$('#tbl-sensor th .arrow').forEach(a => a.textContent = '');
+  const arrow = th.querySelector('.arrow');
+  if (arrow) arrow.textContent = sortDir > 0 ? '▲' : '▼';
+  render();
+}));
+H.$('#btn-csv').addEventListener('click', () => {
+  const list = filtered();
+  H.exportCSV('cityos_sensors.csv',
+    ['编号', '类型', '城区', '位置', '读数', '单位', '状态', '更新时间'],
+    list.map(s => [s.id, s.kind, s.district, s.road, s.value, s.unit, s.status, s.updated]));
+});
+render();
+</script>
+</body>
+</html>
