@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>能源与碳排 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>能源与碳排放</h2>
+        <span class="desc">源网荷储一体化监测 · 双碳目标追踪</span>
+        <div class="actions">
+          <span class="tag ok" id="hd-green">--</span>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <!-- KPI -->
+      <div class="grid g-4" id="kpi-row"></div>
+
+      <!-- 负荷曲线 + 能源结构 -->
+      <div class="grid g-32 mt">
+        <div class="panel">
+          <div class="p-head">
+            <span class="p-title">电网负荷曲线（24h）</span>
+            <div class="p-extra seg" id="load-seg">
+              <button data-k="day" class="active">今日</button>
+              <button data-k="month">近 30 天</button>
+            </div>
+          </div>
+          <div class="p-body"><div class="chart tall" id="ch-load"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">供电结构</span><span class="p-extra">实时出力占比</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-mix"></div></div>
+        </div>
+      </div>
+
+      <!-- 储能 + 碳排 + 建筑能耗榜 -->
+      <div class="grid g-3 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">城市储能站</span><span class="p-extra">120 MWh</span></div>
+          <div class="p-body">
+            <div class="chart short" id="ch-soc" style="min-height:150px"></div>
+            <div class="flex-between mt">
+              <span class="dim">当前功率</span>
+              <b class="mono" id="st-power">--</b>
+            </div>
+            <div class="flex-between mt" style="margin-top:8px">
+              <span class="dim">运行策略</span>
+              <span class="tag info" id="st-mode">--</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">碳排放趋势</span><span class="p-extra">近 30 天 · 吨 CO₂</span></div>
+          <div class="p-body"><div class="chart" id="ch-carbon"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">重点建筑能耗榜</span><span class="p-extra">今日 kWh</span></div>
+          <div class="p-body flush tbl-wrap" style="max-height:280px">
+            <table class="tbl" id="tbl-bld">
+              <thead><tr><th>建筑</th><th class="num">能耗</th><th class="num">节能率</th><th>评级</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分区能耗 + 碳账户 -->
+      <div class="grid g-21 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">分区能耗强度</span><span class="p-extra">kWh / km²·日</span></div>
+          <div class="p-body"><div class="chart" id="ch-dist"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">双碳目标进度</span><span class="p-extra">2026 年度</span></div>
+          <div class="p-body" id="goal-list"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+CityOS.mount('energy');
+const D = CITY_DATA, H = CityOS;
+const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
+
+/* ---------- 顶部角标：绿电占比 ---------- */
+{
+  const green = D.energy.mix.filter(m => ['光伏发电', '风力发电', '水力发电'].includes(m.name))
+    .reduce((a, b) => a + b.value, 0);
+  H.$('#hd-green').textContent = `绿电占比 ${green.toFixed(1)}%`;
+}
+
+/* ---------- KPI ---------- */
+{
+  const peak = Math.max(...D.energy.load24h);
+  const kpis = [
+    { label: '实时负荷', value: D.energy.load24h[new Date().getHours()] || peak * 0.7, unit: 'MW', d: 0, trend: '-1.2%' },
+    { label: '今日峰值', value: peak, unit: 'MW', d: 0, trend: '+0.6%' },
+    { label: '今日碳排放', value: D.energy.carbon.today, unit: 't', d: 0, trend: '-3.4%' },
+    { label: '人均碳排（月均）', value: D.energy.carbon.perCapita, unit: 'kg/日', d: 2, trend: '-0.8%' },
+  ];
+  const row = H.$('#kpi-row');
+  kpis.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'panel kpi';
+    el.innerHTML = `<div class="k-label">${k.label}</div>
+      <div class="k-value"><span class="cv">0</span><span class="unit">${k.unit}</span></div>
+      <div class="k-trend flat">${k.trend} <span class="dim">较昨日</span></div>`;
+    row.appendChild(el);
+    H.countUp(el.querySelector('.cv'), k.value, { decimals: k.d });
+  });
+}
+
+/* ---------- 负荷曲线（今日 / 30 天切换） ---------- */
+const loadChart = H.makeChart(H.$('#ch-load'), {});
+function renderLoad(mode) {
+  if (mode === 'day') {
+    loadChart.setOption({
+      xAxis: { type: 'category', data: hours, boundaryGap: false },
+      yAxis: { type: 'value', name: 'MW' },
+      series: [{
+        name: '负荷', type: 'line', smooth: true, symbol: 'none', data: D.energy.load24h,
+        lineStyle: { width: 2.5, color: '#fbbf24' }, itemStyle: { color: '#fbbf24' },
+        areaStyle: { opacity: 0.16 },
+        markPoint: {
+          data: [{ type: 'max', name: '峰值' }],
+          symbolSize: 46, itemStyle: { color: '#f87171' },
+          label: { fontSize: 10, color: '#fff' },
+        },
+      }],
+      legend: { show: false },
+    }, { replaceMerge: ['series'] });
+  } else {
+    loadChart.setOption({
+      xAxis: { type: 'category', data: D.energy.monthKwh.map((_, i) => (i + 1) + ' 日'), boundaryGap: false },
+      yAxis: { type: 'value', name: '万 kWh' },
+      series: [{
+        name: '日用电量', type: 'line', smooth: true, symbol: 'none', data: D.energy.monthKwh,
+        lineStyle: { width: 2.5, color: '#4fc3f7' }, itemStyle: { color: '#4fc3f7' },
+        areaStyle: { opacity: 0.16 },
+      }],
+      legend: { show: false },
+    }, { replaceMerge: ['series'] });
+  }
+}
+renderLoad('day');
+H.$('#load-seg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  H.$$('#load-seg button').forEach(x => x.classList.toggle('active', x === b));
+  renderLoad(b.dataset.k);
+});
+
+/* ---------- 供电结构（横向堆叠条 + 饼） ---------- */
+H.makeChart(H.$('#ch-mix'), {
+  tooltip: { trigger: 'item', formatter: '{b}：{c}%' },
+  series: [{
+    type: 'pie', radius: ['48%', '74%'], center: ['50%', '50%'],
+    itemStyle: { borderColor: '#0a1020', borderWidth: 2, borderRadius: 6 },
+    label: { color: '#a9bcd8', fontSize: 11, formatter: '{b}\n{c}%' },
+    data: D.energy.mix,
+  }, {
+    type: 'pie', radius: ['0%', '30%'], center: ['50%', '50%'],
+    label: { show: false }, silent: true,
+    data: [{ value: 1, itemStyle: { color: 'rgba(79,195,247,0.06)' } }],
+  }],
+});
+
+/* ---------- 储能 SOC 仪表盘 ---------- */
+{
+  const soc = D.energy.storage.soc;
+  const pw = D.energy.storage.power;
+  H.$('#st-power').textContent = (pw >= 0 ? '+' : '') + pw + ' MW';
+  H.$('#st-mode').textContent = pw >= 0 ? '放电调峰' : '谷电充电';
+  H.makeChart(H.$('#ch-soc'), {
+    series: [{
+      type: 'gauge', startAngle: 210, endAngle: -30, min: 0, max: 100,
+      radius: '100%', center: ['50%', '62%'],
+      progress: { show: true, width: 12, itemStyle: { color: soc > 40 ? '#34d399' : '#fbbf24' } },
+      axisLine: { lineStyle: { width: 12, color: [[1, 'rgba(120,180,255,0.12)']] } },
+      axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+      pointer: { show: false }, anchor: { show: false },
+      detail: {
+        valueAnimation: true, offsetCenter: [0, '-8%'],
+        formatter: v => v + '%',
+        color: '#e8f1ff', fontSize: 26, fontFamily: 'SF Mono, Consolas, monospace',
+      },
+      title: { offsetCenter: [0, '22%'], color: '#64789a', fontSize: 11 },
+      data: [{ value: soc, name: 'SOC 荷电状态' }],
+    }],
+  });
+}
+
+/* ---------- 碳排趋势 ---------- */
+H.makeChart(H.$('#ch-carbon'), {
+  xAxis: { type: 'category', data: D.energy.carbon.monthTrend.map((_, i) => (i + 1) + ''), boundaryGap: false },
+  yAxis: { type: 'value', scale: true },
+  series: [{
+    type: 'line', data: D.energy.carbon.monthTrend, smooth: true, symbol: 'none',
+    lineStyle: { width: 2.5, color: '#34d399' }, itemStyle: { color: '#34d399' },
+    areaStyle: { opacity: 0.15 },
+    markLine: {
+      silent: true, symbol: 'none',
+      lineStyle: { color: '#4fc3f7', type: 'dashed' },
+      data: [{ type: 'average', label: { formatter: '月均值', color: '#4fc3f7', fontSize: 10 } }],
+    },
+  }],
+});
+
+/* ---------- 建筑能耗榜 ---------- */
+{
+  const tb = H.$('#tbl-bld tbody');
+  [...D.energy.buildings].sort((a, b) => b.kwh - a.kwh).forEach(b => {
+    const cls = b.level === '优秀' ? 'ok' : b.level === '良好' ? 'info' : 'warn';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${b.name}</td><td class="num">${H.fmt(b.kwh)}</td>
+      <td class="num">${b.saving}%</td><td>${H.tag(b.level, cls)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------- 分区能耗强度 ---------- */
+{
+  const rnd = D._util.rand;
+  H.makeChart(H.$('#ch-dist'), {
+    xAxis: { type: 'category', data: D.DISTRICTS.map(d => d.short) },
+    yAxis: { type: 'value' },
+    series: [{
+      type: 'bar', barWidth: 22,
+      data: D.DISTRICTS.map(d => {
+        const v = Math.round((d.id === 'industrial' ? 4200 : d.id === 'cbd' ? 3600 : 900 + rnd() * 1200));
+        return { value: v, itemStyle: { borderRadius: [4, 4, 0, 0], color: v > 3000 ? '#7c5cff' : '#4fc3f7' } };
+      }),
+      label: { show: true, position: 'top', color: '#64789a', fontSize: 10 },
+    }],
+  });
+}
+
+/* ---------- 双碳目标 ---------- */
+{
+  const goals = [
+    { name: '单位 GDP 能耗下降', target: 4.5, now: 3.8, unit: '%' },
+    { name: '绿电消费占比', target: 45, now: 40.1, unit: '%' },
+    { name: '充电桩覆盖率（建成区）', target: 90, now: 76, unit: '%' },
+    { name: '既有建筑节能改造', target: 120, now: 88, unit: ' 栋' },
+  ];
+  const box = H.$('#goal-list');
+  goals.forEach(g => {
+    const pct = Math.min(100, Math.round(g.now / g.target * 100));
+    const div = document.createElement('div');
+    div.style.marginBottom = '16px';
+    div.innerHTML = `
+      <div class="flex-between" style="margin-bottom:6px">
+        <span>${g.name}</span>
+        <span class="mono" style="font-size:12px">${g.now}${g.unit} / ${g.target}${g.unit}</span>
+      </div>
+      <div class="bar ${pct >= 90 ? 'ok' : pct >= 60 ? '' : 'warn'}"><i style="width:${pct}%"></i></div>`;
+    box.appendChild(div);
+    requestAnimationFrame(() => {});
+  });
+}
+</script>
+</body>
+</html>
