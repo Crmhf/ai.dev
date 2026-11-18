@@ -209,7 +209,7 @@ function openRoadProfile(r) {
   const citySpdAvg = D.traffic.speed24h.reduce((a, b) => a + b) / 24;
   const rnd = D._util.rand;
   const flow24 = D.traffic.flow24h.map(f => Math.round(r.flow * (f / cityAvg) * (0.92 + rnd() * 0.16)));
-  const speed24 = D.traffic.speed24h.map(s => +(r.speed * (s / citySpd) * (0.94 + rnd() * 0.12)).toFixed(1));
+  const speed24 = D.traffic.speed24h.map(s => +(r.speed * (s / citySpdAvg) * (0.94 + rnd() * 0.12)).toFixed(1));
   const opt = {
     xAxis: { type: 'category', data: hours, boundaryGap: false },
     yAxis: [
