@@ -75,6 +75,19 @@
         </div>
       </div>
 
+      <!-- 调度模拟器 -->
+      <div class="panel mt" id="dispatch-panel">
+        <div class="p-head"><span class="p-title">调度模拟器</span><span class="p-extra">事件 → 资源推荐 → 一键派单</span></div>
+        <div class="p-body">
+          <div class="flex wrap" style="gap:12px">
+            <select id="dp-event" style="flex:1;min-width:280px;font-family:var(--font);font-size:12.5px;color:var(--text-hi);background:rgba(30,50,80,0.5);border:1px solid var(--border-strong);border-radius:999px;padding:7px 14px;outline:none"></select>
+            <button class="btn" id="dp-run">🚒 一键派单</button>
+          </div>
+          <div class="mt" id="dp-plan" style="font-size:12.5px"></div>
+          <div class="mt feed" id="dp-log" style="max-height:140px;overflow:auto"></div>
+        </div>
+      </div>
+
       <!-- 资源 + 演练 -->
       <div class="grid g-21 mt">
         <div class="panel">
@@ -211,6 +224,116 @@ H.$('#evt-seg').addEventListener('click', e => {
     tb.appendChild(tr);
   });
 }
+
+/* ---------- 调度模拟器 ---------- */
+{
+  // 资源状态（可变副本）
+  const resState = D.emergency.resources.map(r => ({ ...r }));
+  // 事件类型 → 资源方案
+  const PLANS = {
+    '火警':     [{ name: '消防车', n: 3 }, { name: '急救车辆', n: 1 }],
+    '燃气泄漏': [{ name: '消防车', n: 2 }, { name: '移动发电车', n: 1 }],
+    '交通事故': [{ name: '急救车辆', n: 2 }],
+    '医疗救援': [{ name: '急救车辆', n: 1 }],
+    '水管爆裂': [{ name: '排涝泵车', n: 1 }, { name: '移动发电车', n: 1 }],
+    '积水预警': [{ name: '排涝泵车', n: 2 }],
+    '人群聚集': [{ name: '应急避难所', n: 1 }],
+    '设备故障': [{ name: '移动发电车', n: 1 }],
+  };
+  const sel = H.$('#dp-event');
+  const planBox = H.$('#dp-plan');
+  const logBox = H.$('#dp-log');
+  let selectedId = null;
+
+  function fillEvents() {
+    const cur = sel.value;
+    sel.innerHTML = '';
+    evts.forEach(e => {
+      const op = document.createElement('option');
+      op.value = e.id;
+      op.textContent = `[${e.type}] ${e.place}（${e.status}）`;
+      sel.appendChild(op);
+    });
+    if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+    selectedId = sel.value;
+    renderPlan();
+  }
+  function renderPlan() {
+    const e = evts.find(x => x.id === sel.value);
+    if (!e) { planBox.innerHTML = ''; return; }
+    const plan = PLANS[e.type] || [{ name: '急救车辆', n: 1 }];
+    const chips = plan.map(p => {
+      const r = resState.find(x => x.name === p.name);
+      const enough = r && r.available >= p.n;
+      return `<span class="tag ${enough ? 'info' : 'danger'}">${p.name} × ${p.n}${enough ? '' : '（不足）'}</span>`;
+    }).join(' ');
+    planBox.innerHTML = `<span class="dim">推荐方案：</span>${chips}
+      <span class="dim" style="margin-left:10px">预计到场 ${8 + Math.floor(Math.random() * 10)} 分钟</span>`;
+  }
+  sel.addEventListener('change', renderPlan);
+
+  function log(text, cls) {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.style.animation = 'rowIn 0.8s ease';
+    div.innerHTML = `<span class="t">${pad(now.getHours())}:${pad(now.getMinutes())}</span>
+      <div class="txt">${text}</div>`;
+    logBox.prepend(div);
+    if (logBox.children.length > 8) logBox.lastChild.remove();
+  }
+
+  function refreshResCards() {
+    const grid = H.$('#res-grid');
+    grid.innerHTML = '';
+    resState.forEach(r => {
+      const pct = Math.round(r.available / r.total * 100);
+      const cls = pct >= 80 ? 'ok' : pct >= 60 ? '' : 'warn';
+      const div = document.createElement('div');
+      div.className = 'panel res-card';
+      div.style.boxShadow = 'none';
+      div.innerHTML = `
+        <div class="dim" style="font-size:12px">${r.name}</div>
+        <div class="n mt">${r.available}<small>/ ${r.total} ${r.unit}</small></div>
+        <div class="bar ${cls} mt"><i style="width:${pct}%"></i></div>`;
+      grid.appendChild(div);
+    });
+  }
+
+  H.$('#dp-run').addEventListener('click', () => {
+    const e = evts.find(x => x.id === sel.value);
+    if (!e) return;
+    if (e.status === '已处置') { log(`⚠️ ${e.id} 已办结，无需重复派单`); return; }
+    const plan = PLANS[e.type] || [{ name: '急救车辆', n: 1 }];
+    const lack = plan.filter(p => {
+      const r = resState.find(x => x.name === p.name);
+      return !r || r.available < p.n;
+    });
+    if (lack.length) {
+      log(`❌ 派单失败：${lack.map(p => p.name).join('、')} 可用数量不足`, 'danger');
+      return;
+    }
+    const btn = H.$('#dp-run');
+    btn.disabled = true;
+    btn.textContent = '⏳ 调度中…';
+    log(`📡 已下达 ${e.id} 调度指令，${plan.map(p => `${p.name}×${p.n}`).join('、')} 出动…`);
+    setTimeout(() => {
+      plan.forEach(p => { resState.find(x => x.name === p.name).available -= p.n; });
+      e.status = '处置中';
+      refreshResCards();
+      const active = document.querySelector('#evt-seg button.active');
+      renderEvents(active ? active.dataset.k : 'all');
+      fillEvents();
+      log(`✅ ${e.id} 力量已到场，状态更新为「处置中」`);
+      btn.disabled = false;
+      btn.textContent = '🚒 一键派单';
+    }, 1400);
+  });
+
+  fillEvents();
+}
+
 </script>
 </body>
 </html>
