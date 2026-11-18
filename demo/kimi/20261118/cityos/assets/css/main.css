@@ -278,9 +278,69 @@ a { color: var(--accent); text-decoration: none; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .wrap { flex-wrap: wrap; }
 
+/* ---------- 全局告警中心 ---------- */
+.alert-bell {
+  position: relative; cursor: pointer; font-size: 15px;
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: rgba(120, 180, 255, 0.05);
+  transition: border-color 0.2s, background 0.2s; user-select: none;
+}
+.alert-bell:hover { border-color: var(--border-strong); background: rgba(120, 180, 255, 0.12); }
+.alert-bell.alarm { animation: bellShake 0.5s ease; border-color: var(--danger); }
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); }
+  60% { transform: rotate(8deg); } 80% { transform: rotate(-6deg); }
+}
+.alert-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px;
+  border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
+  padding: 0 4px; font-family: var(--mono); display: none;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.7);
+}
+.alert-badge.show { display: block; animation: badgePop 0.3s ease; }
+@keyframes badgePop { 0% { transform: scale(0.3); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+.alert-panel {
+  position: fixed; top: calc(var(--topbar-h) + 6px); right: 18px; width: 380px;
+  max-height: 480px; display: none; flex-direction: column; z-index: 200;
+  background: rgba(10, 17, 32, 0.96); border: 1px solid var(--border-strong);
+  border-radius: 10px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px); overflow: hidden;
+}
+.alert-panel.open { display: flex; animation: panelIn 0.22s ease; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+.alert-panel .ap-head {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600; letter-spacing: 1px;
+}
+.alert-panel .ap-head .clear-btn {
+  font-size: 11px; color: var(--accent); cursor: pointer; font-weight: 400;
+  padding: 2px 8px; border-radius: 4px; border: 1px solid transparent;
+}
+.alert-panel .ap-head .clear-btn:hover { border-color: var(--border-strong); }
+.alert-panel .ap-list { overflow-y: auto; flex: 1; }
+.alert-row {
+  display: flex; gap: 8px; align-items: center; padding: 9px 14px;
+  font-size: 12px; border-bottom: 1px dashed rgba(120, 180, 255, 0.1);
+  cursor: pointer; transition: background 0.15s;
+}
+.alert-row:hover { background: rgba(120, 180, 255, 0.06); }
+.alert-row .t { font-family: var(--mono); color: var(--text-low); font-size: 11px; flex-shrink: 0; }
+.alert-row .m { color: var(--text-mid); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-row.unread .m { color: var(--text-hi); font-weight: 600; }
+.alert-row.unread::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: var(--danger); box-shadow: 0 0 6px var(--danger);
+}
+.alert-panel .ap-empty { padding: 26px; text-align: center; color: var(--text-low); font-size: 12px; }
+
 /* 打印友好（报表页） */
 @media print {
-  .sidebar, .topbar, .page-head .actions { display: none !important; }
+  .sidebar, .topbar, .page-head .actions, .alert-panel { display: none !important; }
   body { background: #fff; color: #111; }
   .panel { border: 1px solid #ccc; box-shadow: none; }
 }

@@ -60,10 +60,145 @@
       tb.innerHTML = `
         <div class="crumb"><span class="path">${grp} /</span>${name}</div>
         <div class="spacer"></div>
+        <div class="alert-bell" id="alert-bell" title="告警中心">🔔<span class="alert-badge" id="alert-badge"></span></div>
         <div class="badge-env"><span class="dot"></span>全市 12,847 个物联感知设备在线</div>
         <div class="clock" id="top-clock">--:--:--</div>`;
+      mountAlertCenter();
     }
     startClock();
+  }
+
+  /* ---------- 全局告警中心 ----------
+   * 跨页面共享的告警收件箱：
+   *  - 以 data.js 静态事件为已读基线（首次初始化）
+   *  - 订阅 CityLive 实时事件流，新事件未读并顶栏角标计数
+   *  - localStorage 持久化（key: cityos_alerts，最多保留 30 条）
+   */
+  const ALERT_KEY = 'cityos_alerts';
+  const ALERT_MAX = 30;
+  const ALERT_LEVEL_NAME = { danger: '严重', warn: '关注', info: '提示', mute: '一般' };
+
+  const CityAlerts = {
+    list: [],
+    _panelOpen: false,
+
+    init() {
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem(ALERT_KEY)); } catch (e) { /* 损坏时重建 */ }
+      if (!Array.isArray(stored)) {
+        stored = (global.CITY_DATA ? global.CITY_DATA.emergency.events.slice(0, 10) : [])
+          .map((ev, i) => ({ id: 'seed-' + i, time: ev.time, level: ev.level, type: ev.type, place: ev.place, read: true }));
+        this._save(stored);
+      }
+      this.list = stored;
+      // 页面已引入 live.js：直接订阅；未引入（data/about/emergency 等）：动态加载，仅为告警中心供流
+      if (typeof global.CityLive !== 'undefined') {
+        global.CityLive.on('event', ev => this.push(ev));
+      } else {
+        const s = document.createElement('script');
+        s.src = 'assets/js/live.js';
+        s.onload = () => {
+          global.CityLive.on('event', ev => this.push(ev));
+          global.CityLive.start();
+        };
+        document.head.appendChild(s);
+      }
+      this.renderBadge();
+    },
+
+    _save(list) {
+      try { localStorage.setItem(ALERT_KEY, JSON.stringify((list || this.list).slice(0, ALERT_MAX))); } catch (e) { /* 隐私模式等 */ }
+    },
+
+    push(ev) {
+      this.list.unshift({
+        id: 'live-' + Date.now() + '-' + Math.floor(Math.random() * 1e4),
+        time: ev.time, level: ev.level, type: ev.type, place: ev.place, read: false,
+      });
+      this.list = this.list.slice(0, ALERT_MAX);
+      this._save();
+      this.renderBadge();
+      if (this._panelOpen) this.renderPanel();
+      const bell = document.getElementById('alert-bell');
+      if (bell && ev.level === 'danger') {
+        bell.classList.remove('alarm');
+        void bell.offsetWidth; // 重启动画
+        bell.classList.add('alarm');
+      }
+    },
+
+    unreadCount() { return this.list.filter(a => !a.read).length; },
+
+    markAllRead() {
+      this.list.forEach(a => { a.read = true; });
+      this._save();
+      this.renderBadge();
+      this.renderPanel();
+    },
+
+    markRead(id) {
+      const a = this.list.find(x => x.id === id);
+      if (a && !a.read) { a.read = true; this._save(); this.renderBadge(); this.renderPanel(); }
+    },
+
+    renderBadge() {
+      const badge = document.getElementById('alert-badge');
+      if (!badge) return;
+      const n = this.unreadCount();
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.classList.toggle('show', n > 0);
+    },
+
+    renderPanel() {
+      const panel = document.getElementById('alert-panel');
+      if (!panel) return;
+      const n = this.unreadCount();
+      const rows = this.list.length ? this.list.map(a => `
+        <div class="alert-row ${a.read ? '' : 'unread'}" data-aid="${a.id}">
+          <span class="t">${a.time}</span>
+          ${tag(ALERT_LEVEL_NAME[a.level] || '提示', EVT_TAG[a.level] || 'info')}
+          <span class="tag mute" style="flex-shrink:0">${a.type}</span>
+          <span class="m">${a.place}</span>
+        </div>`).join('')
+        : '<div class="ap-empty">暂无告警，城市运行平稳</div>';
+      panel.innerHTML = `
+        <div class="ap-head">
+          <span>告警中心 <span class="dim" style="font-weight:400">未读 ${n} 条</span></span>
+          <span class="clear-btn" id="alert-clear">全部已读</span>
+        </div>
+        <div class="ap-list">${rows}</div>`;
+      panel.querySelector('#alert-clear').addEventListener('click', () => this.markAllRead());
+      panel.querySelectorAll('.alert-row').forEach(row => {
+        row.addEventListener('click', () => this.markRead(row.dataset.aid));
+      });
+    },
+
+    togglePanel() {
+      let panel = document.getElementById('alert-panel');
+      if (!panel) {
+        panel = document.createElement('div');
+        panel.className = 'alert-panel';
+        panel.id = 'alert-panel';
+        document.body.appendChild(panel);
+        document.addEventListener('click', e => {
+          if (this._panelOpen && !panel.contains(e.target) && e.target.id !== 'alert-bell' && !document.getElementById('alert-bell').contains(e.target)) {
+            this.togglePanel();
+          }
+        });
+      }
+      this._panelOpen = !this._panelOpen;
+      panel.classList.toggle('open', this._panelOpen);
+      if (this._panelOpen) this.renderPanel();
+    },
+  };
+
+  let alertCenterMounted = false;
+  function mountAlertCenter() {
+    if (alertCenterMounted) return;
+    alertCenterMounted = true;
+    CityAlerts.init();
+    const bell = document.getElementById('alert-bell');
+    if (bell) bell.addEventListener('click', () => CityAlerts.togglePanel());
   }
 
   /* ---------- 实时时钟 ---------- */
@@ -192,5 +327,5 @@
     })(t0);
   }
 
-  global.CityOS = { mount, makeChart, sparkline, baseOption, $, $$, fmt, tag, LEVEL_TAG, EVT_TAG, exportCSV, countUp, PALETTE };
+  global.CityOS = { mount, makeChart, sparkline, baseOption, $, $$, fmt, tag, LEVEL_TAG, EVT_TAG, exportCSV, countUp, PALETTE, alerts: CityAlerts };
 })(window);
