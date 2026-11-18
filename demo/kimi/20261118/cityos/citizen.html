@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>市民服务 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .hotword {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 14px; margin: 4px 5px;
+    border: 1px solid var(--border-strong); border-radius: 999px;
+    background: rgba(79, 195, 247, 0.06); color: var(--text-mid);
+    cursor: default; transition: all .15s;
+  }
+  .hotword:hover { border-color: var(--accent); color: var(--text-hi); transform: translateY(-1px); }
+  .hotword .heat { font-family: var(--mono); font-size: 10px; color: var(--accent); }
+  .pipeline { display: flex; align-items: center; gap: 0; margin: 6px 0 2px; }
+  .pipeline .node {
+    flex: 1; text-align: center; font-size: 11px; color: var(--text-low);
+    padding: 7px 2px; border: 1px solid var(--border); background: rgba(10,16,28,0.5);
+  }
+  .pipeline .node:first-child { border-radius: 999px 0 0 999px; }
+  .pipeline .node:last-child { border-radius: 0 999px 999px 0; }
+  .pipeline .node.cur { color: #fff; background: rgba(79,195,247,0.3); border-color: var(--accent); }
+  .pipeline .node.done { color: var(--ok); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>市民服务热线 · 12345</h2>
+        <span class="desc">诉求受理 · 流转办理 · 满意度回访</span>
+        <div class="actions">
+          <span class="tag info" id="hd-total">--</span>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <!-- KPI -->
+      <div class="grid g-4" id="kpi-row"></div>
+
+      <div class="grid g-32 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">诉求量趋势</span><span class="p-extra">近 30 天</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-trend"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">诉求分类</span><span class="p-extra">今日占比</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-cat"></div></div>
+        </div>
+      </div>
+
+      <div class="grid g-21 mt">
+        <div class="panel">
+          <div class="p-head">
+            <span class="p-title">工单流转</span>
+            <div class="p-extra seg" id="tk-seg">
+              <button data-k="all" class="active">全部</button>
+              <button data-k="doing">在办</button>
+              <button data-k="urgent">加急</button>
+            </div>
+          </div>
+          <div class="p-body" id="ticket-list" style="max-height:420px;overflow:auto"></div>
+        </div>
+        <div>
+          <div class="panel">
+            <div class="p-head"><span class="p-title">满意度回访</span></div>
+            <div class="p-body"><div class="chart short" id="ch-sat" style="min-height:170px"></div></div>
+          </div>
+          <div class="panel mt">
+            <div class="p-head"><span class="p-title">热点诉求</span><span class="p-extra">按热度</span></div>
+            <div class="p-body wrap" style="display:flex;flex-wrap:wrap" id="hot-box"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/live.js"></script>
+<script>
+CityOS.mount('citizen');
+const D = CITY_DATA, H = CityOS;
+
+H.$('#hd-total').textContent = `今日受理 ${H.fmt(D.citizen.todayTotal)} 件`;
+
+/* ---------- KPI ---------- */
+{
+  const doing = D.citizen.tickets.filter(t => t.status === '办理中' || t.status === '已转派').length;
+  const kpis = [
+    { label: '按时办结率', value: D.citizen.timeliness, unit: '%', d: 1 },
+    { label: '平均办理时长', value: D.citizen.avgHours, unit: '小时', d: 1 },
+    { label: '回访满意率', value: D.citizen.satisfaction, unit: '%', d: 1 },
+    { label: '在办工单', value: doing, unit: '件', d: 0 },
+  ];
+  const row = H.$('#kpi-row');
+  kpis.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'panel kpi';
+    el.innerHTML = `<div class="k-label">${k.label}</div>
+      <div class="k-value"><span class="cv">0</span><span class="unit">${k.unit}</span></div>`;
+    row.appendChild(el);
+    H.countUp(el.querySelector('.cv'), k.value, { decimals: k.d });
+  });
+}
+
+/* ---------- 趋势 ---------- */
+H.makeChart(H.$('#ch-trend'), {
+  xAxis: { type: 'category', data: D.citizen.trend30d.map((_, i) => (i + 1) + ''), boundaryGap: false },
+  yAxis: { type: 'value', name: '件/日', scale: true },
+  series: [{
+    type: 'line', data: D.citizen.trend30d, smooth: true, symbol: 'none',
+    lineStyle: { width: 2.5 }, areaStyle: { opacity: 0.16 },
+    markArea: {
+      silent: true,
+      itemStyle: { color: 'rgba(251,191,36,0.08)' },
+      data: [[{ xAxis: '20', label: { show: true, formatter: '雨季诉求高峰', color: '#fbbf24', fontSize: 10, position: 'insideTop' } }, { xAxis: '26' }]],
+    },
+  }],
+});
+
+/* ---------- 分类 ---------- */
+H.makeChart(H.$('#ch-cat'), {
+  tooltip: { trigger: 'item', formatter: '{b}：{c} 件（{d}%）' },
+  series: [{
+    type: 'pie', radius: ['42%', '70%'], center: ['50%', '50%'],
+    itemStyle: { borderColor: '#0a1020', borderWidth: 2, borderRadius: 6 },
+    label: { color: '#a9bcd8', fontSize: 11 },
+    data: D.citizen.categories,
+  }],
+});
+
+/* ---------- 工单流转（带流转管线） ---------- */
+const PIPE = ['受理', '转派', '办理', '办结', '回访'];
+const STATUS_NODE = { '已转派': 1, '办理中': 2, '已办结': 3, '已回访': 4 };
+function renderTickets(mode) {
+  const box = H.$('#ticket-list');
+  box.innerHTML = '';
+  const list = D.citizen.tickets.filter(t =>
+    mode === 'all' ? true :
+    mode === 'doing' ? (t.status === '办理中' || t.status === '已转派') : t.urgent);
+  list.forEach(t => {
+    const cur = STATUS_NODE[t.status];
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px;background:rgba(10,16,28,0.4)';
+    div.innerHTML = `
+      <div class="flex-between">
+        <span style="font-size:13px">${t.urgent ? '🔥 ' : ''}${t.title}</span>
+        ${H.tag(t.status, t.status === '办理中' ? 'warn' : t.status === '已转派' ? 'info' : 'ok')}
+      </div>
+      <div class="dim mt" style="font-size:11px;margin:6px 0">${t.id} · ${t.time} 受理 · 承办：${t.dept}</div>
+      <div class="pipeline">${PIPE.map((p, i) =>
+        `<span class="node ${i < cur ? 'done' : i === cur ? 'cur' : ''}">${p}</span>`).join('')}</div>`;
+    box.appendChild(div);
+  });
+  if (!list.length) box.innerHTML = '<div class="empty">当前筛选下暂无工单</div>';
+}
+renderTickets('all');
+H.$('#tk-seg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  H.$$('#tk-seg button').forEach(x => x.classList.toggle('active', x === b));
+  renderTickets(b.dataset.k);
+});
+
+/* ---------- 满意度仪表 ---------- */
+H.makeChart(H.$('#ch-sat'), {
+  series: [{
+    type: 'gauge', startAngle: 200, endAngle: -20, min: 80, max: 100,
+    radius: '105%', center: ['50%', '65%'],
+    progress: { show: true, width: 10, itemStyle: { color: '#34d399' } },
+    axisLine: { lineStyle: { width: 10, color: [[1, 'rgba(120,180,255,0.12)']] } },
+    axisTick: { show: false }, splitLine: { show: false },
+    axisLabel: { show: false }, pointer: { show: false }, anchor: { show: false },
+    detail: { valueAnimation: true, offsetCenter: [0, '-10%'], formatter: v => v + '%',
+      color: '#e8f1ff', fontSize: 24, fontFamily: 'SF Mono, Consolas, monospace' },
+    title: { offsetCenter: [0, '20%'], color: '#64789a', fontSize: 11 },
+    data: [{ value: D.citizen.satisfaction, name: '回访满意率' }],
+  }],
+});
+
+/* ---------- 热点诉求 ---------- */
+{
+  const box = H.$('#hot-box');
+  [...D.citizen.hotWords].sort((a, b) => b.heat - a.heat).forEach(w => {
+    const size = 11 + Math.round(w.heat / 18);
+    const sp = document.createElement('span');
+    sp.className = 'hotword';
+    sp.style.fontSize = size + 'px';
+    sp.innerHTML = `${w.word}<span class="heat">${w.heat}</span>`;
+    box.appendChild(sp);
+  });
+}
+
+/* ---------- 实时：新诉求工单流入 ---------- */
+{
+  let seq = 0;
+  CityLive.on('event', () => {
+    // 部分城市事件会转化为 12345 工单
+    if (Math.random() > 0.5) return;
+    seq += 1;
+    const cat = D.citizen.categories[Math.floor(Math.random() * D.citizen.categories.length)];
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    D.citizen.tickets.unshift({
+      id: 'GD-L' + (2611900 + seq * 11),
+      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      title: cat.name + '类诉求 · ' + D.DISTRICTS[Math.floor(Math.random() * 6)].name,
+      dept: '智能分派中',
+      status: '已转派',
+      urgent: Math.random() < 0.2,
+    });
+    if (D.citizen.tickets.length > 16) D.citizen.tickets.pop();
+    const active = document.querySelector('#tk-seg button.active');
+    renderTickets(active ? active.dataset.k : 'all');
+  });
+  CityLive.start();
+}
+</script>
+</body>
+</html>
