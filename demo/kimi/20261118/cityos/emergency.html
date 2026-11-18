@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>应急指挥 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .alert-strip {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px 16px; border-radius: var(--radius-m);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.12), transparent 70%);
+    margin-bottom: 16px; font-size: 13px;
+  }
+  .alert-strip .blink { animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+  .res-card { padding: 12px 14px; }
+  .res-card .n { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .res-card .n small { font-size: 11px; color: var(--text-low); font-weight: 400; margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>应急指挥中心</h2>
+        <span class="desc">事件接报 · 资源调度 · 预案演练</span>
+        <div class="actions">
+          <span class="tag danger" id="hd-active">--</span>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <div class="alert-strip">
+        <span class="blink">🟡</span>
+        <span><b>黄色预警</b> · 市气象台 14:20 发布：今夜到明晨有短时强降水，请注意滨河低洼路段积水风险。</span>
+        <span class="dim" style="margin-left:auto;font-size:11px">预警编号 YJ-2026118-03</span>
+      </div>
+
+      <!-- KPI -->
+      <div class="grid g-4" id="kpi-row"></div>
+
+      <!-- 事件列表 + 处置漏斗 -->
+      <div class="grid g-32 mt">
+        <div class="panel">
+          <div class="p-head">
+            <span class="p-title">今日事件接报</span>
+            <div class="p-extra seg" id="evt-seg">
+              <button data-k="all" class="active">全部</button>
+              <button data-k="active">处置中</button>
+              <button data-k="done">已办结</button>
+            </div>
+          </div>
+          <div class="p-body flush tbl-wrap" style="max-height:420px">
+            <table class="tbl" id="tbl-evt">
+              <thead><tr><th>编号</th><th>时间</th><th>类型</th><th>地点</th><th class="num">处置用时</th><th>状态</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="panel">
+            <div class="p-head"><span class="p-title">事件等级分布</span></div>
+            <div class="p-body"><div class="chart" id="ch-level" style="min-height:200px"></div></div>
+          </div>
+          <div class="panel mt">
+            <div class="p-head"><span class="p-title">分时段接报量</span></div>
+            <div class="p-body"><div class="chart" id="ch-hour" style="min-height:180px"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 资源 + 演练 -->
+      <div class="grid g-21 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">应急资源待命</span><span class="p-extra">实时可用 / 总数</span></div>
+          <div class="p-body"><div class="grid g-3" id="res-grid"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">预案演练计划</span></div>
+          <div class="p-body flush tbl-wrap">
+            <table class="tbl" id="tbl-drill">
+              <thead><tr><th>演练科目</th><th>日期</th><th>牵头单位</th><th>状态</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+CityOS.mount('emergency');
+const D = CITY_DATA, H = CityOS;
+const evts = D.emergency.events;
+
+/* ---------- KPI ---------- */
+{
+  const active = evts.filter(e => e.status === '处置中' || e.status === '已派单').length;
+  const danger = evts.filter(e => e.level === 'danger').length;
+  H.$('#hd-active').textContent = `处置中 ${active} 起`;
+  const avgMin = Math.round(evts.reduce((a, e) => a + parseInt(e.duration), 0) / evts.length);
+  const kpis = [
+    { label: '今日接报', value: evts.length, unit: '起', d: 0 },
+    { label: '处置中 / 已派单', value: active, unit: '起', d: 0 },
+    { label: '高危事件', value: danger, unit: '起', d: 0 },
+    { label: '平均处置用时', value: avgMin, unit: '分钟', d: 0 },
+  ];
+  const row = H.$('#kpi-row');
+  kpis.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'panel kpi';
+    el.innerHTML = `<div class="k-label">${k.label}</div>
+      <div class="k-value"><span class="cv">0</span><span class="unit">${k.unit}</span></div>`;
+    row.appendChild(el);
+    H.countUp(el.querySelector('.cv'), k.value, { decimals: k.d });
+  });
+}
+
+/* ---------- 事件表（可筛选） ---------- */
+function renderEvents(mode) {
+  const tb = H.$('#tbl-evt tbody');
+  tb.innerHTML = '';
+  const list = evts.filter(e =>
+    mode === 'all' ? true :
+    mode === 'active' ? (e.status === '处置中' || e.status === '已派单') :
+    e.status === '已处置');
+  list.forEach(e => {
+    const lvlTag = { danger: 'danger', warn: 'warn', info: 'info', mute: 'mute' }[e.level];
+    const stTag = e.status === '处置中' ? 'warn' : e.status === '已派单' ? 'info' : 'ok';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono dim">${e.id}</td><td class="mono">${e.time}</td>
+      <td>${H.tag(e.type, lvlTag)}</td><td>${e.place}</td>
+      <td class="num">${e.duration}</td><td>${H.tag(e.status, stTag)}</td>`;
+    tb.appendChild(tr);
+  });
+  if (!list.length) tb.innerHTML = '<tr><td colspan="6"><div class="empty">当前筛选下暂无事件</div></td></tr>';
+}
+renderEvents('all');
+H.$('#evt-seg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  H.$$('#evt-seg button').forEach(x => x.classList.toggle('active', x === b));
+  renderEvents(b.dataset.k);
+});
+
+/* ---------- 等级分布 ---------- */
+{
+  const cnt = {};
+  evts.forEach(e => { cnt[e.type] = (cnt[e.type] || 0) + 1; });
+  H.makeChart(H.$('#ch-level'), {
+    tooltip: { trigger: 'item' },
+    series: [{
+      type: 'pie', radius: ['40%', '68%'], center: ['50%', '52%'],
+      itemStyle: { borderColor: '#0a1020', borderWidth: 2, borderRadius: 6 },
+      label: { color: '#a9bcd8', fontSize: 11, formatter: '{b} {c}' },
+      data: Object.entries(cnt).map(([name, value]) => ({ name, value })),
+    }],
+  });
+}
+
+/* ---------- 分时段接报 ---------- */
+{
+  const byHour = new Array(24).fill(0);
+  evts.forEach(e => { byHour[parseInt(e.time.split(':')[0])]++; });
+  H.makeChart(H.$('#ch-hour'), {
+    xAxis: { type: 'category', data: byHour.map((_, i) => i + '') },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{
+      type: 'bar', data: byHour, barWidth: '60%',
+      itemStyle: { borderRadius: [3, 3, 0, 0], color: '#f87171' },
+    }],
+    grid: { left: 12, right: 10, top: 14, bottom: 8, containLabel: true },
+  });
+}
+
+/* ---------- 资源卡片 ---------- */
+{
+  const grid = H.$('#res-grid');
+  D.emergency.resources.forEach(r => {
+    const pct = Math.round(r.available / r.total * 100);
+    const cls = pct >= 80 ? 'ok' : pct >= 60 ? '' : 'warn';
+    const div = document.createElement('div');
+    div.className = 'panel res-card';
+    div.style.boxShadow = 'none';
+    div.innerHTML = `
+      <div class="dim" style="font-size:12px">${r.name}</div>
+      <div class="n mt">${r.available}<small>/ ${r.total} ${r.unit}</small></div>
+      <div class="bar ${cls} mt"><i style="width:${pct}%"></i></div>`;
+    grid.appendChild(div);
+  });
+}
+
+/* ---------- 演练计划 ---------- */
+{
+  const tb = H.$('#tbl-drill tbody');
+  D.emergency.drills.forEach(d => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${d.name}</td><td class="mono">${d.date}</td><td class="dim">${d.dept}</td>
+      <td>${H.tag(d.status, d.status === '已完成' ? 'ok' : 'warn')}</td>`;
+    tb.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>
