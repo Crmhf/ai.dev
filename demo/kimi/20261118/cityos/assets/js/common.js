@@ -46,14 +46,16 @@
         <div class="brand">
           <div class="name">梅塔维尔 <em>CityOS</em></div>
           <div class="sub">City Operation System</div>
+          <button class="sb-toggle" id="sb-toggle" title="收起 / 展开侧栏">⇤</button>
         </div><nav>`;
       NAV.forEach(n => {
         if (n.group) { html += `<div class="nav-group">${n.group}</div>`; return; }
-        html += `<a class="nav-item ${n.id === pageId ? 'active' : ''}" href="${n.href}">
-          <span class="ico">${n.ico}</span>${n.label}</a>`;
+        html += `<a class="nav-item ${n.id === pageId ? 'active' : ''}" href="${n.href}" title="${n.label}">
+          <span class="ico">${n.ico}</span><span class="lbl">${n.label}</span></a>`;
       });
       html += `</nav><div class="foot">v2.4.1 · 静态演示环境<br/>数据为程序生成模拟值</div>`;
       sb.innerHTML = html;
+      initSidebarToggle();
     }
     if (tb) {
       const [grp, name] = TITLES[pageId] || ['', ''];
@@ -66,6 +68,26 @@
       mountAlertCenter();
     }
     startClock();
+  }
+
+  /* ---------- 侧栏折叠（localStorage 记忆 + 窄屏自动收起） ---------- */
+  const SB_KEY = 'cityos_sidebar';
+  function initSidebarToggle() {
+    let pref = null;
+    try { pref = localStorage.getItem(SB_KEY); } catch (e) { /* ignore */ }
+    // 无用户偏好时：窄屏（<1100px）默认收起
+    const collapsed = pref === null ? (window.innerWidth || 1920) < 1100 : pref === '1';
+    document.body.classList.toggle('sb-collapsed', collapsed);
+    const btn = document.getElementById('sb-toggle');
+    if (btn) {
+      btn.textContent = collapsed ? '⇥' : '⇤';
+      btn.addEventListener('click', () => {
+        const next = !document.body.classList.contains('sb-collapsed');
+        document.body.classList.toggle('sb-collapsed', next);
+        btn.textContent = next ? '⇥' : '⇤';
+        try { localStorage.setItem(SB_KEY, next ? '1' : '0'); } catch (e) { /* ignore */ }
+      });
+    }
   }
 
   /* ---------- 全局告警中心 ----------
