@@ -16,7 +16,7 @@ python3 -m http.server 8080   # 或 npx serve .
 | --- | --- | --- |
 | 可视化大屏 | `cityos/screen.html` | 指挥中心投影风：**1920×1080 设计稿 + transform scale 全分辨率自适应**（DataV 实践）、SVG 城市一张图（车流光线/车辆光点/事件闪烁定位）、大字号实时计数、滚动趋势、拥堵 TOP5 实时重排、事件流自动滚动、底部快报走马灯 |
 | 态势总览 | `cityos/index.html` | KPI 卡（滚动+迷你趋势）、24h 城市脉搏（车流/能耗切换）、**城区对比（点击柱体下钻至数据分析页）**、能源结构、AQI、事件流；接入实时引擎：LIVE 徽标、新事件高亮插入、KPI 抖动、脉搏当前点跟随 |
-| 3D 城市沙盘 | `cityos/sandbox.html` | Three.js 程序化地形/河流/441 栋建筑/180 辆车/2600 棵树/大桥/昼夜循环；**数字孪生交互**：图层开关、六视角巡航、时间轴拖动、点击建筑拾取孪生档案 + 高亮框；**空间分析**：两点测距、圆形区域框选统计（建筑数/均高/能耗） |
+| 数智一张图 | `cityos/sandbox.html` | **以 3D 地图为中心的孪生指挥视图**：程序化地形/河流/441 栋建筑/180 辆车/昼夜循环；左侧专题图层 dock——综合（实时 KPI）/交通（道路拥堵红黄绿着色）/能源（建筑能耗热力染色）/应急（事件 3D 图钉+光柱，实时事件自动落图，点击图钉看详情）/环境（六区 AQI 热区）；另有图层开关、六视角巡航、时间轴、建筑拾取档案、测距/区域统计 |
 | 交通运行 | `cityos/traffic.html` | 流量车速双轴、**拥堵榜点击行弹出道路画像（24h 流量/车速曲线 + 实时指标）**、道路×小时热力图、轨道满载、停车饱和度、出行分担 |
 | 能源与碳排 | `cityos/energy.html` | 负荷曲线（日/月切换）、供电结构、储能 SOC 仪表盘、碳排趋势、双碳目标 |
 | 水务与环境 | `cityos/water.html` | 水文站水位过程线（警戒线联动）、逐时雨量、水质指标、泵站、内涝风险点；实时水位微涨落 |
@@ -41,7 +41,7 @@ python3 -m http.server 8080   # 或 npx serve .
 
 ```
 cityos/
-├── screen.html / index.html / sandbox.html / traffic.html
+├── screen.html / index.html / sandbox.html(数智一张图) / traffic.html
 ├── energy.html / emergency.html / data.html / about.html
 └── assets/
     ├── css/main.css     # 设计系统：令牌 + 布局 + 组件
