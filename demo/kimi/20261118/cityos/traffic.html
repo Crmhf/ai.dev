@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>交通运行 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>交通运行监测</h2>
+        <span class="desc">路网 · 轨道 · 公交 · 停车 四位一体监测</span>
+        <div class="actions">
+          <span class="tag warn" id="hd-peak">--</span>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <!-- KPI -->
+      <div class="grid g-4" id="kpi-row"></div>
+
+      <!-- 流量车速 + 拥堵榜 -->
+      <div class="grid g-32 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">全城流量 / 平均车速（24h）</span><span class="p-extra">双轴联动</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-flow"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">重点道路拥堵榜</span><span class="p-extra">实时指数</span></div>
+          <div class="p-body flush tbl-wrap" style="max-height:352px">
+            <table class="tbl" id="tbl-road">
+              <thead><tr><th>道路</th><th>等级</th><th class="num">车速 km/h</th><th class="num">流量 辆/h</th><th>状态</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 轨道 + 停车 + 热力 -->
+      <div class="grid g-3 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">轨道交通</span><span class="p-extra" id="metro-daily">--</span></div>
+          <div class="p-body" id="metro-list"></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">公共停车饱和度</span><span class="p-extra">按城区</span></div>
+          <div class="p-body"><div class="chart" id="ch-park"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">分时段拥堵热力</span><span class="p-extra">道路 × 小时</span></div>
+          <div class="p-body"><div class="chart" id="ch-heat"></div></div>
+        </div>
+      </div>
+
+      <!-- 公交与慢行 -->
+      <div class="grid g-3 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">公交运营</span></div>
+          <div class="p-body">
+            <div class="flex-between mb"><span class="dim">在营线路</span><b class="mono" id="bus-routes">--</b></div>
+            <div class="flex-between mb"><span class="dim">准点率</span><b class="mono" id="bus-ontime">--</b></div>
+            <div class="flex-between mb"><span class="dim">今日客流（估）</span><b class="mono" id="bus-flow">--</b></div>
+            <div class="bar ok mt"><i id="bus-bar" style="width:0%"></i></div>
+            <div class="dim mt" style="font-size:11px">准点率目标 ≥ 90%</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">出行方式分担</span><span class="p-extra">工作日</span></div>
+          <div class="p-body"><div class="chart" id="ch-mode"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">交通警情</span><span class="p-extra">今日</span></div>
+          <div class="p-body"><div class="feed" id="traffic-feed" style="max-height:220px;overflow:auto"></div></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+CityOS.mount('traffic');
+const D = CITY_DATA, H = CityOS;
+const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
+
+/* ---------- 顶部角标 ---------- */
+{
+  const peak = Math.max(...D.traffic.flow24h);
+  const peakH = D.traffic.flow24h.indexOf(peak);
+  H.$('#hd-peak').textContent = `今日峰值 ${H.fmt(peak)} 辆/h @ ${peakH}:00`;
+}
+
+/* ---------- KPI ---------- */
+{
+  const avgSpeed = Math.round(D.traffic.speed24h.reduce((a, b) => a + b) / 24);
+  const jamRoads = D.traffic.congestionIndex.filter(r => r.index >= 1.7).length;
+  const totalFlow = D.traffic.flow24h.reduce((a, b) => a + b, 0);
+  const kpis = [
+    { label: '今日总车流量', value: totalFlow / 10000, unit: '万辆', d: 1, trend: '+2.4%' },
+    { label: '全天平均车速', value: avgSpeed, unit: 'km/h', d: 0, trend: '-1.8%' },
+    { label: '拥堵路段数', value: jamRoads, unit: '条', d: 0, trend: '持平' },
+    { label: '地铁日客运量', value: D.traffic.transit.metroDaily, unit: '万人次', d: 0, trend: '+5.1%' },
+  ];
+  const row = H.$('#kpi-row');
+  kpis.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'panel kpi';
+    el.innerHTML = `<div class="k-label">${k.label}</div>
+      <div class="k-value"><span class="cv">0</span><span class="unit">${k.unit}</span></div>
+      <div class="k-trend flat">${k.trend} <span class="dim">较昨日</span></div>`;
+    row.appendChild(el);
+    H.countUp(el.querySelector('.cv'), k.value, { decimals: k.d });
+  });
+}
+
+/* ---------- 流量 / 车速双轴 ---------- */
+H.makeChart(H.$('#ch-flow'), {
+  xAxis: { type: 'category', data: hours, boundaryGap: false },
+  yAxis: [
+    { type: 'value', name: '辆/h' },
+    { type: 'value', name: 'km/h', min: 0, max: 60, splitLine: { show: false } },
+  ],
+  series: [
+    { name: '车流量', type: 'line', smooth: true, symbol: 'none', data: D.traffic.flow24h,
+      lineStyle: { width: 2.5 }, areaStyle: { opacity: 0.16 } },
+    { name: '平均车速', type: 'line', smooth: true, symbol: 'none', yAxisIndex: 1, data: D.traffic.speed24h,
+      lineStyle: { width: 2, type: 'dashed', color: '#34d399' }, itemStyle: { color: '#34d399' } },
+  ],
+});
+
+/* ---------- 拥堵榜 ---------- */
+{
+  const tb = H.$('#tbl-road tbody');
+  [...D.traffic.congestionIndex].sort((a, b) => b.index - a.index).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.name}</td><td class="dim">${r.level}</td>
+      <td class="num">${r.speed}</td><td class="num">${H.fmt(r.flow)}</td>
+      <td>${H.tag(r.status + ' ' + r.index.toFixed(2), H.LEVEL_TAG[r.status])}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------- 轨道交通 ---------- */
+{
+  const box = H.$('#metro-list');
+  H.$('#metro-daily').textContent = '日客运 ' + D.traffic.transit.metroDaily + ' 万人次';
+  D.traffic.transit.metroLines.forEach(l => {
+    const row = document.createElement('div');
+    row.style.marginBottom = '14px';
+    row.innerHTML = `
+      <div class="flex-between mb" style="margin-bottom:6px">
+        <span><i class="dot" style="background:${l.color};box-shadow:0 0 6px ${l.color}"></i>${l.name}
+          <span class="dim" style="font-size:11px;margin-left:8px">${l.stations} 站 · 准点 ${l.onTime}%</span></span>
+        <span class="mono" style="font-size:12px">${Math.round(l.crowd * 100)}%</span>
+      </div>
+      <div class="bar ${l.crowd > 0.75 ? 'warn' : 'ok'}"><i style="width:${l.crowd * 100}%"></i></div>`;
+    box.appendChild(row);
+  });
+  const tip = document.createElement('div');
+  tip.className = 'dim';
+  tip.style.cssText = 'font-size:11px;margin-top:4px';
+  tip.textContent = '满载率 = 当前断面客流 / 设计运力';
+  box.appendChild(tip);
+}
+
+/* ---------- 停车饱和度 ---------- */
+H.makeChart(H.$('#ch-park'), {
+  grid: { left: 12, right: 30, top: 10, bottom: 8, containLabel: true },
+  xAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%' } },
+  yAxis: { type: 'category', data: D.traffic.parking.map(p => p.name), inverse: true,
+    axisLine: { lineStyle: { color: 'rgba(120,180,255,0.25)' } } },
+  series: [{
+    type: 'bar', barWidth: 12,
+    data: D.traffic.parking.map(p => {
+      const v = Math.round(p.used / p.total * 100);
+      return { value: v, itemStyle: { color: v > 85 ? '#f87171' : v > 70 ? '#fbbf24' : '#34d399', borderRadius: [0, 4, 4, 0] } };
+    }),
+    label: { show: true, position: 'right', color: '#a9bcd8', fontSize: 10, formatter: '{c}%' },
+  }],
+});
+
+/* ---------- 分时段拥堵热力 ---------- */
+{
+  const roads = D.traffic.congestionIndex.map(r => r.name);
+  const heatData = [];
+  const rnd = D._util.rand;
+  roads.forEach((r, ri) => {
+    const base = D.traffic.congestionIndex[ri].index;
+    for (let h = 0; h < 24; h++) {
+      const peakF = Math.exp(-Math.pow(h - 8, 2) / 4) + Math.exp(-Math.pow(h - 18, 2) / 5);
+      const v = Math.min(3, Math.max(0.6, base * (0.5 + peakF * 0.8) + (rnd() - 0.5) * 0.3));
+      heatData.push([h, ri, +v.toFixed(2)]);
+    }
+  });
+  H.makeChart(H.$('#ch-heat'), {
+    grid: { left: 12, right: 10, top: 10, bottom: 40, containLabel: true },
+    tooltip: { position: 'top', formatter: p => `${roads[p.value[1]]} ${p.value[0]}:00<br/>拥堵指数 ${p.value[2]}` },
+    xAxis: { type: 'category', data: hours, splitArea: { show: false } },
+    yAxis: { type: 'category', data: roads, inverse: true },
+    visualMap: {
+      min: 0.6, max: 3, calculable: false, orient: 'horizontal',
+      left: 'center', bottom: 0, itemWidth: 10, itemHeight: 90,
+      textStyle: { color: '#64789a', fontSize: 10 },
+      inRange: { color: ['#123c36', '#34d399', '#fbbf24', '#f87171'] },
+    },
+    series: [{ type: 'heatmap', data: heatData, label: { show: false }, itemStyle: { borderColor: '#0a1020', borderWidth: 1 } }],
+  });
+}
+
+/* ---------- 公交 ---------- */
+{
+  H.$('#bus-routes').textContent = D.traffic.transit.busRoutes + ' 条';
+  H.$('#bus-ontime').textContent = D.traffic.transit.busOnTime + '%';
+  H.$('#bus-flow').textContent = Math.round(D.traffic.transit.busRoutes * 0.62) + ' 万人次';
+  setTimeout(() => { H.$('#bus-bar').style.width = D.traffic.transit.busOnTime + '%'; }, 200);
+}
+
+/* ---------- 出行分担 ---------- */
+H.makeChart(H.$('#ch-mode'), {
+  tooltip: { trigger: 'item', formatter: '{b}：{c}%' },
+  series: [{
+    type: 'pie', radius: ['42%', '70%'], center: ['50%', '52%'],
+    itemStyle: { borderColor: '#0a1020', borderWidth: 2, borderRadius: 6 },
+    label: { color: '#a9bcd8', fontSize: 11 },
+    data: [
+      { name: '轨道交通', value: 31 },
+      { name: '公交', value: 18 },
+      { name: '私家车', value: 27 },
+      { name: '出租车/网约车', value: 9 },
+      { name: '骑行', value: 8 },
+      { name: '步行', value: 7 },
+    ],
+  }],
+});
+
+/* ---------- 交通警情 ---------- */
+{
+  const feed = H.$('#traffic-feed');
+  D.emergency.events.filter(e => e.type === '交通事故' || e.type === '设备故障').forEach(ev => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `<span class="t">${ev.time}</span>
+      <div class="txt"><b>[${ev.type}]</b> ${ev.place} · 处置用时 ${ev.duration}</div>`;
+    feed.appendChild(div);
+  });
+  if (!feed.children.length) feed.innerHTML = '<div class="empty">今日暂无交通类警情</div>';
+}
+</script>
+</body>
+</html>
