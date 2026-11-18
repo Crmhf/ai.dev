@@ -207,8 +207,119 @@
     weather: { temp: rint(9, 14), text: '多云转阴', humidity: rint(52, 68), wind: '东北风 3 级' },
   };
 
-  /* ---------- 传感器（数据分析页） ---------- */
-  const sensors = [];
+  /* ---------- 水务与环境 ---------- */
+  const water = {
+    stations: [
+      { name: '梅江河 · 上游水文站', river: '梅江河', level: rfloat(2.8, 3.6, 2), warn: 5.50, trend: null },
+      { name: '梅江河 · 城区闸口站', river: '梅江河', level: rfloat(3.4, 4.2, 2), warn: 6.00, trend: null },
+      { name: '支流的溪 · 山岭入口站', river: '的溪', level: rfloat(1.6, 2.4, 2), warn: 4.00, trend: null },
+    ],
+    rain24h: Array.from({ length: 24 }, (_, h) => {
+      const peak = Math.exp(-Math.pow(h - 21, 2) / 6);
+      return +(peak * 14 + rand() * 1.2).toFixed(1);
+    }),
+    quality: [
+      { name: 'pH', value: rfloat(7.1, 7.6, 2), std: '6.5~8.5', pct: 0 },
+      { name: '溶解氧', value: rfloat(6.2, 8.4, 1), std: '≥5 mg/L', pct: 0 },
+      { name: '氨氮', value: rfloat(0.2, 0.7, 2), std: '≤1.0 mg/L', pct: 0 },
+      { name: 'COD', value: rfloat(9, 16, 0), std: '≤20 mg/L', pct: 0 },
+      { name: '浊度', value: rfloat(2, 6, 1), std: '≤10 NTU', pct: 0 },
+    ],
+    pumps: [
+      { name: '滨河 1# 泵站', flow: rint(60, 95), status: '运行' },
+      { name: '滨河 2# 泵站', flow: rint(50, 90), status: '运行' },
+      { name: '工业雨水泵站', flow: rint(30, 70), status: '运行' },
+      { name: '临港排涝泵站', flow: 0, status: '待机' },
+      { name: '老城合流泵站', flow: rint(20, 60), status: '运行' },
+      { name: '山岭补水泵站', flow: 0, status: '检修' },
+    ],
+    floodSpots: [
+      { place: '滨河东路下穿通道', risk: '高', depth: rint(8, 22) },
+      { place: '老城步行街南口', risk: '中', depth: rint(4, 10) },
+      { place: '工业大道辅道低洼段', risk: '中', depth: rint(3, 9) },
+      { place: '临港物流园西区', risk: '低', depth: rint(0, 4) },
+    ],
+  };
+  water.stations.forEach(s => {
+    s.trend = Array.from({ length: 24 }, (_, h) =>
+      +(s.level + Math.sin((h - 15) / 24 * Math.PI * 2) * 0.3 + (rand() - 0.5) * 0.1).toFixed(2));
+    s.riskPct = Math.round(s.level / s.warn * 100);
+  });
+  water.quality.forEach(q => { q.ok = true; });
+
+  /* ---------- 市民服务（12345 热线） ---------- */
+  const citizen = {
+    todayTotal: rint(860, 980),
+    categories: [
+      { name: '物业服务', value: rint(150, 220) },
+      { name: '市容环境', value: rint(120, 190) },
+      { name: '噪音扰民', value: rint(90, 150) },
+      { name: '交通出行', value: rint(80, 140) },
+      { name: '水电气暖', value: rint(60, 110) },
+      { name: '消费维权', value: rint(40, 80) },
+      { name: '其他', value: rint(50, 90) },
+    ],
+    timeliness: rfloat(93, 97, 1),       // 按时办结率 %
+    avgHours: rfloat(18, 30, 1),          // 平均办理时长
+    satisfaction: rfloat(92, 97, 1),      // 满意率 %
+    trend30d: monthSeries(880, 0.02, 90),
+    hotWords: [
+      { word: '电梯故障', heat: rint(70, 98) },
+      { word: '夜间施工噪音', heat: rint(60, 92) },
+      { word: '占道停车', heat: rint(55, 88) },
+      { word: '垃圾清运', heat: rint(40, 75) },
+      { word: '供暖温度', heat: rint(35, 70) },
+      { word: '油烟排放', heat: rint(30, 62) },
+      { word: '路灯不亮', heat: rint(25, 55) },
+      { word: '犬只管理', heat: rint(18, 45) },
+    ],
+    tickets: [],
+  };
+  {
+    const STATES = ['已办结', '已办结', '办理中', '已转派', '已回访'];
+    const DEPTS = ['住建局', '城管局', '生态环境分局', '交通局', '水务局', '市场监管局', '公安分局'];
+    for (let i = 0; i < 12; i++) {
+      const cat = pick(citizen.categories);
+      const hh = String(rint(7, 20)).padStart(2, '0');
+      const mm = String(rint(0, 59)).padStart(2, '0');
+      citizen.tickets.push({
+        id: 'GD-2611' + String(140 + i * 7),
+        time: `${hh}:${mm}`,
+        title: cat.name + '类诉求 · ' + pick(DISTRICTS).name,
+        dept: pick(DEPTS),
+        status: pick(STATES),
+        urgent: rand() < 0.22,
+      });
+    }
+    citizen.tickets.sort((a, b) => b.time.localeCompare(a.time));
+  }
+
+  /* ---------- 预测研判 ---------- */
+  const forecast = {
+    loadPred: [], loadActual: [], jamPred: [],
+    rules: [
+      { id: 'r1', name: '电网负荷越限', metric: 'load', op: '>', threshold: 900, unit: 'MW', enabled: true },
+      { id: 'r2', name: '全城拥堵预警', metric: 'jam', op: '>', threshold: 2.0, unit: '', enabled: true },
+      { id: 'r3', name: 'AQI 轻度污染', metric: 'aqi', op: '>', threshold: 100, unit: '', enabled: true },
+      { id: 'r4', name: '河道水位警戒', metric: 'wlevel', op: '>', threshold: 5.2, unit: 'm', enabled: true },
+      { id: 'r5', name: '诉求量突增', metric: 'citizen', op: '>', threshold: 950, unit: '件', enabled: false },
+    ],
+    accuracy: { load: rfloat(94, 97, 1), jam: rfloat(89, 93, 1), aqi: rfloat(91, 95, 1) },
+  };
+  {
+    const base = D => D; // 占位
+    const h0 = new Date().getHours();
+    for (let h = 0; h < 24; h++) {
+      const morning = Math.exp(-Math.pow(h - 8.6, 2) / 3.2);
+      const evening = Math.exp(-Math.pow(h - 18.6, 2) / 4.2);
+      const pred = Math.round(620 * (0.3 + morning * 0.9 + evening * 1.05) + 40);
+      forecast.loadPred.push(pred);
+      forecast.loadActual.push(h <= h0 ? Math.max(0, Math.round(pred + (rand() - 0.5) * 60)) : null);
+      forecast.jamPred.push(+(1.3 + morning * 0.5 + evening * 0.75 + (rand() - 0.5) * 0.06).toFixed(2));
+    }
+  }
+
+  /* ---------- 传感器（数据分析页） ---------- */  const sensors = [];
   {
     const kinds = ['流量', '环境', '能耗', '水位', '结构'];
     for (let i = 0; i < 60; i++) {
@@ -234,6 +345,7 @@
   global.CITY_DATA = {
     DISTRICTS, ROADS, BUILDINGS_TOP, POI_TYPES,
     traffic, energy, emergency, environment, overview, sensors,
+    water, citizen, forecast,
     dailyProfile, monthSeries,
     _util: { rand, pick, rint, rfloat },
   };
