@@ -19,6 +19,8 @@
         <div class="actions">
           <span class="tag ok" id="w-temp">--</span>
           <span class="tag info" id="w-text">--</span>
+          <span class="tag warn" id="live-badge" style="display:none">● LIVE</span>
+          <a class="btn sm" href="screen.html">🖥 可视化大屏</a>
           <a class="btn sm" href="sandbox.html">进入 3D 沙盘 →</a>
         </div>
       </div>
@@ -83,6 +85,7 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/js/data.js"></script>
 <script src="assets/js/common.js"></script>
+<script src="assets/js/live.js"></script>
 <script>
 CityOS.mount('overview');
 const D = CITY_DATA, H = CityOS;
@@ -115,7 +118,9 @@ H.$('#w-text').textContent = D.overview.weather.text + ' · 湿度 ' + D.overvie
 /* ---------- 24h 脉搏（可切换） ---------- */
 const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
 const pulseChart = H.makeChart(H.$('#ch-pulse'), {});
+let pulseMode = 'traffic';
 function renderPulse(mode) {
+  pulseMode = mode;
   const series = [];
   if (mode === 'traffic' || mode === 'both') {
     series.push({
@@ -223,7 +228,7 @@ H.makeChart(H.$('#ch-mix'), {
   const cnt = {};
   D.emergency.events.forEach(e => { cnt[e.type] = (cnt[e.type] || 0) + 1; });
   const data = Object.entries(cnt).map(([name, value]) => ({ name, value }));
-  H.makeChart(H.$('#ch-evt'), {
+  const evtChart = H.makeChart(H.$('#ch-evt'), {
     tooltip: { trigger: 'item' },
     series: [{
       type: 'pie', radius: ['0%', '68%'], center: ['50%', '52%'],
@@ -233,6 +238,54 @@ H.makeChart(H.$('#ch-mix'), {
       data,
     }],
   });
+}
+
+/* ---------- 实时引擎接入：事件流 + KPI 抖动 + 脉搏推进 ---------- */
+{
+  H.$('#live-badge').style.display = '';
+  let evtTotal = D.emergency.events.length;
+  const feed = H.$('#evt-feed');
+
+  CityLive.on('event', ev => {
+    evtTotal += 1;
+    H.$('#evt-count').textContent = '今日 ' + evtTotal + ' 起';
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.style.animation = 'rowIn 0.8s ease';
+    div.innerHTML = `<span class="t">${ev.time}</span>
+      <div class="txt"><b>[${ev.type}]</b> ${ev.place} ${H.tag(ev.status, ev.status === '处置中' ? 'warn' : 'info')} ${H.tag('实时', 'danger')}</div>`;
+    feed.prepend(div);
+    if (feed.children.length > 20) feed.lastChild.remove();
+    // 事件类型分布同步 +1
+    const item = data.find(d => d.name === ev.type);
+    if (item) item.value += 1; else data.push({ name: ev.type, value: 1 });
+    evtChart.setOption({ series: [{ data }] });
+  });
+
+  // KPI 实时抖动 + 脉搏图当前点跟随
+  const kpiEnergy = H.$('#kpi-energy');
+  const kpiAqi = H.$('#kpi-aqi');
+  const kpiTraffic = H.$('#kpi-traffic');
+  CityLive.on('tick', t => {
+    if (kpiEnergy) kpiEnergy.textContent = H.fmt(Math.round(t.load));
+    if (kpiAqi) kpiAqi.textContent = Math.round(t.aqi);
+    if (kpiTraffic) kpiTraffic.textContent = t.jamIndex.toFixed(2);
+    // 脉搏图：当前小时的数据点跟随实时值（仅更新已存在的系列）
+    const h = new Date().getHours();
+    const upd = [];
+    if (pulseMode === 'traffic' || pulseMode === 'both') {
+      const flow = [...D.traffic.flow24h];
+      flow[h] = Math.round(t.flow);
+      upd.push({ name: '车流量 (辆/h)', data: flow });
+    }
+    if (pulseMode === 'energy' || pulseMode === 'both') {
+      const load = [...D.energy.load24h];
+      load[h] = Math.round(t.load);
+      upd.push({ name: '用电负荷 (MW)', data: load });
+    }
+    pulseChart.setOption({ series: upd });
+  });
+  CityLive.start();
 }
 </script>
 </body>

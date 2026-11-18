@@ -263,6 +263,9 @@ a { color: var(--accent); text-decoration: none; }
 .dot.danger { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
 .dot.info { background: var(--info); box-shadow: 0 0 6px var(--info); }
 
+/* 行进入动画（实时事件插入） */
+@keyframes rowIn { from { background: rgba(79, 195, 247, 0.25); } to { background: transparent; } }
+
 /* 空状态 */
 .empty { color: var(--text-low); font-size: 12px; text-align: center; padding: 28px 0; }
 
