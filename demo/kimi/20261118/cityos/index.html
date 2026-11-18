@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>态势总览 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>城市运行态势总览</h2>
+        <span class="desc">全市六区 · 12,847 路感知设备 · 分钟级刷新</span>
+        <div class="actions">
+          <span class="tag ok" id="w-temp">--</span>
+          <span class="tag info" id="w-text">--</span>
+          <a class="btn sm" href="sandbox.html">进入 3D 沙盘 →</a>
+        </div>
+      </div>
+
+      <!-- KPI 行 -->
+      <div class="grid g-6" id="kpi-row"></div>
+
+      <!-- 主图区 -->
+      <div class="grid g-32 mt">
+        <div class="panel">
+          <div class="p-head">
+            <span class="p-title">24 小时城市脉搏</span>
+            <div class="p-extra seg" id="pulse-seg">
+              <button data-k="traffic" class="active">车流</button>
+              <button data-k="energy">能耗</button>
+              <button data-k="both">叠加</button>
+            </div>
+          </div>
+          <div class="p-body"><div class="chart tall" id="ch-pulse"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">城区人口与面积</span><span class="p-extra">六区对比</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-district"></div></div>
+        </div>
+      </div>
+
+      <div class="grid g-3 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">能源结构</span><span class="p-extra">今日供电占比</span></div>
+          <div class="p-body"><div class="chart" id="ch-mix"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">空气质量近 7 日</span><span class="p-extra" id="aqi-now">--</span></div>
+          <div class="p-body"><div class="chart" id="ch-aqi"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">路网健康度</span><span class="p-extra">10 条重点道路</span></div>
+          <div class="p-body flush tbl-wrap" style="max-height:264px">
+            <table class="tbl" id="tbl-roads">
+              <thead><tr><th>道路</th><th>等级</th><th class="num">指数</th><th>状态</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid g-21 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">实时事件流</span><span class="p-extra" id="evt-count">--</span></div>
+          <div class="p-body"><div class="feed" id="evt-feed" style="max-height:300px;overflow:auto"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">事件类型分布</span><span class="p-extra">今日</span></div>
+          <div class="p-body"><div class="chart" id="ch-evt" style="min-height:300px"></div></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script>
+CityOS.mount('overview');
+const D = CITY_DATA, H = CityOS;
+
+/* ---------- 天气角标 ---------- */
+H.$('#w-temp').textContent = '🌡 ' + D.overview.weather.temp + '°C';
+H.$('#w-text').textContent = D.overview.weather.text + ' · 湿度 ' + D.overview.weather.humidity + '% · ' + D.overview.weather.wind;
+
+/* ---------- KPI 卡 ---------- */
+{
+  const row = H.$('#kpi-row');
+  const colors = ['#4fc3f7', '#7c5cff', '#fbbf24', '#34d399', '#f87171', '#60a5fa'];
+  D.overview.kpis.forEach((k, i) => {
+    const card = document.createElement('div');
+    card.className = 'panel kpi';
+    const decimals = (String(k.value).includes('.')) ? 1 : 0;
+    const trendCls = k.trend > 0 ? 'up' : k.trend < 0 ? 'down' : 'flat';
+    const arrow = k.trend > 0 ? '▲' : k.trend < 0 ? '▼' : '—';
+    card.innerHTML = `
+      <div class="k-label">${k.label}</div>
+      <div class="k-value"><span id="kpi-${k.id}">0</span><span class="unit">${k.unit}</span></div>
+      <div class="k-trend ${trendCls}">${arrow} ${Math.abs(k.trend)}% <span class="dim">较昨日</span></div>
+      <div class="k-spark" id="spark-${k.id}"></div>`;
+    row.appendChild(card);
+    H.countUp(H.$('#kpi-' + k.id), k.value, { decimals });
+    H.sparkline(H.$('#spark-' + k.id), k.spark, colors[i % colors.length]);
+  });
+}
+
+/* ---------- 24h 脉搏（可切换） ---------- */
+const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
+const pulseChart = H.makeChart(H.$('#ch-pulse'), {});
+function renderPulse(mode) {
+  const series = [];
+  if (mode === 'traffic' || mode === 'both') {
+    series.push({
+      name: '车流量 (辆/h)', type: 'line', smooth: true, data: D.traffic.flow24h,
+      symbol: 'none', lineStyle: { width: 2.5 },
+      areaStyle: { opacity: 0.18 },
+    });
+  }
+  if (mode === 'energy' || mode === 'both') {
+    series.push({
+      name: '用电负荷 (MW)', type: 'line', smooth: true, data: D.energy.load24h,
+      symbol: 'none', lineStyle: { width: 2.5, color: '#fbbf24' },
+      itemStyle: { color: '#fbbf24' },
+      areaStyle: { opacity: 0.15 }, yAxisIndex: mode === 'both' ? 1 : 0,
+    });
+  }
+  const option = {
+    xAxis: { type: 'category', data: hours, boundaryGap: false },
+    yAxis: mode === 'both'
+      ? [{ type: 'value', name: '辆/h' }, { type: 'value', name: 'MW', splitLine: { show: false } }]
+      : { type: 'value' },
+    series,
+    legend: { show: mode === 'both' },
+    dataZoom: [{ type: 'inside' }],
+  };
+  pulseChart.setOption(option, { replaceMerge: ['series', 'yAxis'] });
+}
+renderPulse('traffic');
+H.$('#pulse-seg').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  H.$$('#pulse-seg button').forEach(x => x.classList.toggle('active', x === b));
+  renderPulse(b.dataset.k);
+});
+
+/* ---------- 城区人口与面积 ---------- */
+H.makeChart(H.$('#ch-district'), {
+  xAxis: { type: 'category', data: D.DISTRICTS.map(d => d.short) },
+  yAxis: [
+    { type: 'value', name: '万人' },
+    { type: 'value', name: 'km²', splitLine: { show: false } },
+  ],
+  series: [
+    { name: '常住人口', type: 'bar', data: D.DISTRICTS.map(d => d.pop), barWidth: 18,
+      itemStyle: { borderRadius: [4, 4, 0, 0], color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#4fc3f7' }, { offset: 1, color: '#4fc3f722' }] } } },
+    { name: '辖区面积', type: 'line', yAxisIndex: 1, smooth: true, data: D.DISTRICTS.map(d => d.area),
+      symbolSize: 7, lineStyle: { width: 2, color: '#7c5cff' }, itemStyle: { color: '#7c5cff' } },
+  ],
+});
+
+/* ---------- 能源结构饼图 ---------- */
+H.makeChart(H.$('#ch-mix'), {
+  tooltip: { trigger: 'item', formatter: '{b}<br/>{c}%（{d}%）' },
+  series: [{
+    type: 'pie', radius: ['46%', '72%'], center: ['50%', '52%'],
+    itemStyle: { borderColor: '#0a1020', borderWidth: 2, borderRadius: 6 },
+    label: { color: '#a9bcd8', fontSize: 11, formatter: '{b}\n{c}%' },
+    data: D.energy.mix,
+  }],
+});
+
+/* ---------- AQI 7 日 ---------- */
+{
+  const wk = D.environment.aqiWeek;
+  H.$('#aqi-now').textContent = '当前 ' + D.environment.aqi + ' · ' + (D.environment.aqi <= 50 ? '优' : D.environment.aqi <= 100 ? '良' : '轻度污染');
+  H.makeChart(H.$('#ch-aqi'), {
+    xAxis: { type: 'category', data: ['6 天前', '5 天前', '4 天前', '3 天前', '前天', '昨天', '今天'] },
+    yAxis: { type: 'value', min: 0, max: 120 },
+    series: [{
+      type: 'line', data: wk, smooth: true, symbolSize: 7,
+      lineStyle: { width: 2.5, color: '#34d399' }, itemStyle: { color: '#34d399' },
+      areaStyle: { opacity: 0.15 },
+      markLine: {
+        silent: true, symbol: 'none',
+        lineStyle: { color: '#fbbf24', type: 'dashed' },
+        data: [{ yAxis: 100, label: { formatter: '轻度污染线', color: '#fbbf24', fontSize: 10 } }],
+      },
+    }],
+  });
+}
+
+/* ---------- 路网健康表 ---------- */
+{
+  const tb = H.$('#tbl-roads tbody');
+  [...D.traffic.congestionIndex].sort((a, b) => b.index - a.index).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.name}</td><td class="dim">${r.level}</td>
+      <td class="num">${r.index.toFixed(2)}</td><td>${H.tag(r.status, H.LEVEL_TAG[r.status])}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------- 事件流 + 类型分布 ---------- */
+{
+  const feed = H.$('#evt-feed');
+  D.emergency.events.forEach(ev => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `<span class="t">${ev.time}</span>
+      <div class="txt"><b>[${ev.type}]</b> ${ev.place} ${H.tag(ev.status, ev.status === '处置中' ? 'warn' : ev.status === '已派单' ? 'info' : 'ok')}</div>`;
+    feed.appendChild(div);
+  });
+  H.$('#evt-count').textContent = '今日 ' + D.emergency.events.length + ' 起';
+
+  const cnt = {};
+  D.emergency.events.forEach(e => { cnt[e.type] = (cnt[e.type] || 0) + 1; });
+  const data = Object.entries(cnt).map(([name, value]) => ({ name, value }));
+  H.makeChart(H.$('#ch-evt'), {
+    tooltip: { trigger: 'item' },
+    series: [{
+      type: 'pie', radius: ['0%', '68%'], center: ['50%', '52%'],
+      roseType: 'radius',
+      itemStyle: { borderColor: '#0a1020', borderWidth: 2, borderRadius: 5 },
+      label: { color: '#a9bcd8', fontSize: 11 },
+      data,
+    }],
+  });
+}
+</script>
+</body>
+</html>
