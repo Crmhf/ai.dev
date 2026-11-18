@@ -7,9 +7,16 @@
 <link rel="stylesheet" href="assets/css/main.css" />
 <style>
   /* ---------- 大屏专用视觉 ---------- */
-  body { overflow: hidden; }
+  body { overflow: hidden; background: var(--bg-deep); }
+  /* 1920×1080 设计稿 + transform scale 自适应（DataV 标准实践） */
+  .stage-shell {
+    position: fixed; inset: 0; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
   .screen {
-    height: 100vh; display: flex; flex-direction: column;
+    width: 1920px; height: 1080px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    transform-origin: center center;
     background:
       radial-gradient(1400px 500px at 50% -10%, rgba(79, 195, 247, 0.10), transparent 60%),
       radial-gradient(1000px 600px at 50% 115%, rgba(124, 92, 255, 0.10), transparent 60%),
@@ -130,7 +137,8 @@
 </style>
 </head>
 <body>
-<div class="screen">
+<div class="stage-shell">
+<div class="screen" id="stage">
   <!-- 头部 -->
   <div class="s-head">
     <div class="side l">
@@ -265,11 +273,23 @@
     <div class="marquee"><div class="track" id="mq-track"></div></div>
   </div>
 </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/js/data.js"></script>
 <script src="assets/js/common.js"></script>
 <script src="assets/js/live.js"></script>
+<script>
+/* ---------- 1920×1080 舞台缩放 ---------- */
+function fitStage() {
+  const vw = window.innerWidth || 1920;
+  const vh = window.innerHeight || 1080;
+  const s = Math.min(vw / 1920, vh / 1080);
+  document.getElementById('stage').style.transform = `scale(${s})`;
+}
+fitStage();
+window.addEventListener('resize', fitStage);
+</script>
 <script>
 const D = CITY_DATA, H = CityOS;
 const SVGNS = 'http://www.w3.org/2000/svg';
