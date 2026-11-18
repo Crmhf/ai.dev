@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>3D 城市沙盘 · 梅塔维尔 CityOS</title>
+<title>数智一张图 · 梅塔维尔 CityOS</title>
 <style>
   :root {
     --panel-bg: rgba(10, 16, 28, 0.72);
@@ -134,6 +134,61 @@
   #bld-card .tg { font-size: 10px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(120,180,255,0.35); color: #a9bcd8; }
   #bld-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.6; font-size: 14px; }
   #bld-close:hover { opacity: 1; }
+
+  /* ---------- 数智一张图：专题图层 dock ---------- */
+  #theme-dock {
+    top: 50%; left: 20px; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .th-tab {
+    width: 58px; padding: 9px 0 7px; position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 18px; background: var(--panel-bg);
+    border: 1px solid var(--panel-border); border-radius: 10px;
+    cursor: pointer; backdrop-filter: blur(10px); transition: all .15s ease;
+  }
+  .th-tab span { font-size: 10px; letter-spacing: 1px; opacity: 0.8; }
+  .th-tab:hover { border-color: var(--accent); }
+  .th-tab.active { background: rgba(79, 195, 247, 0.25); border-color: var(--accent); box-shadow: 0 0 14px rgba(79, 195, 247, 0.3); }
+  .th-tab .dot-alert {
+    position: absolute; top: -3px; right: -3px; width: 9px; height: 9px;
+    border-radius: 50%; background: #f87171; box-shadow: 0 0 6px #f87171; display: none;
+  }
+  .th-tab .dot-alert.on { display: block; animation: tabPulse 0.9s ease infinite; }
+  @keyframes tabPulse { 50% { transform: scale(1.6); opacity: 0.5; } }
+
+  /* 主题指标面板（左下） */
+  #theme-panel {
+    bottom: 96px; left: 20px; width: 236px; padding: 12px 16px;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 12px; backdrop-filter: blur(10px); font-size: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45); line-height: 1.5;
+  }
+  #theme-panel .tp-t { font-size: 11px; letter-spacing: 2px; font-weight: 600; margin-bottom: 8px; }
+  #theme-panel .tp-t::before { content: ""; display: inline-block; width: 3px; height: 10px; background: var(--accent); border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  #theme-panel .row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  #theme-panel .k { opacity: 0.65; }
+  #theme-panel .v { color: var(--accent); font-family: "SF Mono", "Consolas", monospace; font-variant-numeric: tabular-nums; }
+  #theme-panel .v.warn { color: #fbbf24; }
+  #theme-panel .v.danger { color: #f87171; }
+
+  /* 事件详情卡 */
+  #evt-card {
+    position: fixed; bottom: 24px; right: 380px; width: 250px; z-index: 12;
+    background: var(--panel-bg); border: 1px solid #fbbf24;
+    border-radius: 12px; backdrop-filter: blur(10px);
+    box-shadow: 0 0 24px rgba(251, 191, 36, 0.2);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 14px 16px; display: none; font-size: 12px;
+  }
+  #evt-card h4 { font-size: 14px; margin-bottom: 8px; letter-spacing: 1px; }
+  #evt-card .row { display: flex; justify-content: space-between; padding: 3px 0; opacity: 0.9; }
+  #evt-card .row .k { opacity: 0.6; }
+  #evt-card .row .v { font-family: "SF Mono", monospace; }
+  #evt-card .go { display: block; margin-top: 10px; text-align: center; font-size: 11px; padding: 6px 0; border-radius: 7px; border: 1px solid rgba(120,180,255,0.35); color: #4fc3f7; text-decoration: none; }
+  #evt-card .go:hover { background: rgba(79,195,247,0.15); }
+  #evt-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.6; font-size: 14px; }
+  #evt-close:hover { opacity: 1; }
 </style>
 
 
@@ -195,6 +250,32 @@
   <div class="tags" id="bld-tags"></div>
 </div>
 
+<!-- 事件详情卡 -->
+<div id="evt-card">
+  <span id="evt-close">✕</span>
+  <h4 id="evt-title">--</h4>
+  <div class="row"><span class="k">发生时间</span><span class="v" id="evt-time">--</span></div>
+  <div class="row"><span class="k">事件等级</span><span class="v" id="evt-level">--</span></div>
+  <div class="row"><span class="k">当前状态</span><span class="v" id="evt-status">--</span></div>
+  <div class="row"><span class="k">已持续</span><span class="v" id="evt-dur">--</span></div>
+  <a class="go" href="emergency.html">前往应急指挥 →</a>
+</div>
+
+<!-- 专题图层 dock（数智一张图核心入口） -->
+<div id="theme-dock" class="hud">
+  <div class="th-tab active" data-th="overview">🏙<span>综合</span></div>
+  <div class="th-tab" data-th="traffic">🚦<span>交通</span></div>
+  <div class="th-tab" data-th="energy">⚡<span>能源</span></div>
+  <div class="th-tab" data-th="emergency">🚨<span>应急</span><i class="dot-alert" id="th-dot-emergency"></i></div>
+  <div class="th-tab" data-th="env">🌿<span>环境</span></div>
+</div>
+
+<!-- 主题指标面板 -->
+<div id="theme-panel" class="hud">
+  <div class="tp-t" id="tp-title">综合态势</div>
+  <div id="tp-body"></div>
+</div>
+
 <script type="importmap">
 {
   "imports": {
@@ -213,11 +294,11 @@
 </div>
 
 <div id="title-panel" class="hud">
-  <h1>梅塔维尔 <span class="sub">METAVILLE</span> · 3D 城市沙盘</h1>
-  <p>程序化生成的虚拟城市：中央商务区、滨河住宅区、工业港区与山岭公园。拖拽旋转，滚轮缩放，右键平移。</p>
+  <h1>梅塔维尔 <span class="sub">METAVILLE</span> · 数智一张图</h1>
+  <p>以 3D 城市地图为中心的孪生指挥视图：左侧切换专题图层（交通着色 / 能耗染色 / 事件点位 / 环境热区），点击建筑与事件图钉可查看孪生档案。拖拽旋转，滚轮缩放。</p>
   <p style="margin-top:10px;display:flex;gap:8px">
     <a href="index.html" style="color:#4fc3f7;border:1px solid rgba(120,180,255,0.35);border-radius:999px;padding:4px 12px;font-size:11px;text-decoration:none">← 返回态势总览</a>
-    <a href="traffic.html" style="color:#a9bcd8;border:1px solid rgba(120,180,255,0.25);border-radius:999px;padding:4px 12px;font-size:11px;text-decoration:none">交通运行 →</a>
+    <a href="screen.html" style="color:#a9bcd8;border:1px solid rgba(120,180,255,0.25);border-radius:999px;padding:4px 12px;font-size:11px;text-decoration:none">可视化大屏 →</a>
   </p>
 </div>
 
@@ -253,6 +334,8 @@
   </svg>
 </div>
 
+<script src="assets/js/data.js"></script>
+<script src="assets/js/live.js"></script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1153,6 +1236,8 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (r.width === 0 || r.height === 0) return;
   pointerNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   if (window.__analysisClick && window.__analysisClick(pointerNDC)) return;
+  const pinHit = pickEventPin(pointerNDC);
+  if (pinHit) { showEvtCard(pinHit.object.userData.ev); return; }
   const hit = pickBuilding(pointerNDC);
   if (hit) {
     const m = new THREE.Matrix4();
@@ -1316,6 +1401,301 @@ window.__forceSize = (w, h) => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
+};
+
+/* ============================================================
+ * 16. 数智一张图：专题图层 + 事件点位 + 主题指标
+ * ============================================================ */
+const D = window.CITY_DATA || null;
+const themeTabs = document.querySelectorAll('#theme-dock .th-tab');
+let curTheme = 'overview';
+let lastTick = window.CityLive ? CityLive.now() : null;
+
+/* ---- 专题层 1：交通拥堵道路着色 ---- */
+const trafficLayer = new THREE.Group();
+trafficLayer.visible = false;
+if (D) {
+  const cong = D.traffic.congestionIndex;
+  roadLines.forEach((line, i) => {
+    const c = cong[i % cong.length];
+    const color = c.index >= 2.1 ? 0xf87171 : c.index >= 1.7 ? 0xfbbf24 : 0x34d399;
+    const len = line.to - line.from;
+    const geo = line.axis === 'x'
+      ? new THREE.PlaneGeometry(len, ROAD_W - 4)
+      : new THREE.PlaneGeometry(ROAD_W - 4, len);
+    geo.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.5, depthWrite: false,
+    }));
+    if (line.axis === 'x') m.position.set((line.from + line.to) / 2, CITY_Y + 0.6, line.coord);
+    else m.position.set(line.coord, CITY_Y + 0.6, (line.from + line.to) / 2);
+    trafficLayer.add(m);
+  });
+}
+scene.add(trafficLayer);
+
+/* ---- 专题层 2：能源能耗建筑染色 ---- */
+const origBldColors = buildingColors.map(c => c.clone());
+const heatA = new THREE.Color(0x34d399), heatB = new THREE.Color(0xfbbf24), heatC = new THREE.Color(0xf87171);
+function tintBuildingsByEnergy(on) {
+  const c = new THREE.Color();
+  for (let i = 0; i < buildings.count; i++) {
+    if (!on) c.copy(origBldColors[i]);
+    else {
+      const e = (800 + bldRand(i, 4) * 9200) / 10000;   // 0.08 ~ 1.0
+      if (e < 0.5) c.copy(heatA).lerp(heatB, e * 2);
+      else c.copy(heatB).lerp(heatC, (e - 0.5) * 2);
+    }
+    buildings.setColorAt(i, c);
+  }
+  buildings.instanceColor.needsUpdate = true;
+}
+
+/* ---- 专题层 3：应急事件点位（图钉 + 脉冲圈，常显） ---- */
+const eventLayer = new THREE.Group();
+scene.add(eventLayer);
+const pinGeo = new THREE.ConeGeometry(7, 24, 8);
+pinGeo.rotateX(Math.PI);                          // 尖端朝下
+const pinRingGeo = new THREE.RingGeometry(8, 12, 28);
+pinRingGeo.rotateX(-Math.PI / 2);
+const pinBeamGeo = new THREE.CylinderGeometry(2.2, 2.2, 64, 8, 1, true);
+const LEVEL_COLOR = { danger: 0xf87171, warn: 0xfbbf24, info: 0x60a5fa, mute: 0x94a3b8 };
+const LEVEL_NAME = { danger: '严重', warn: '关注', info: '提示', mute: '一般' };
+const eventPins = [];      // { group, ring, cone, ev, phase }
+const pinHitMeshes = [];
+let pinSeq = 0;
+
+function addEventPin(ev) {
+  const i = pinSeq++;
+  let x = (bldRand(i, 11) - 0.5) * 760;
+  let z = (bldRand(i, 23) - 0.5) * 760;
+  if (inRiver(x, z, 80)) x += 170;
+  const gy = Math.max(terrainHeight(x, z), CITY_Y);
+  const color = LEVEL_COLOR[ev.level] || 0x94a3b8;
+  const group = new THREE.Group();
+  const cone = new THREE.Mesh(pinGeo, new THREE.MeshBasicMaterial({ color }));
+  cone.position.set(0, 70, 0);
+  cone.userData.ev = ev;
+  const beam = new THREE.Mesh(pinBeamGeo, new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  beam.position.y = 32;
+  beam.userData.ev = ev;
+  const ring = new THREE.Mesh(pinRingGeo, new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  ring.position.y = 1.5;
+  group.add(cone); group.add(beam); group.add(ring);
+  group.position.set(x, gy, z);
+  eventLayer.add(group);
+  eventPins.push({ group, ring, cone, beam, ev, phase: bldRand(i, 37) * Math.PI * 2 });
+  pinHitMeshes.push(cone, beam);
+  // 图钉数量上限，超出移除最旧
+  if (eventPins.length > 24) {
+    const old = eventPins.shift();
+    eventLayer.remove(old.group);
+    [old.cone, old.beam].forEach(m => {
+      const idx = pinHitMeshes.indexOf(m);
+      if (idx >= 0) pinHitMeshes.splice(idx, 1);
+    });
+  }
+}
+function pickEventPin(ndc) {
+  raycaster.setFromCamera(ndc, camera);
+  // 图钉纤细，改用“射线最近点距离”容差拾取（半径 22 世界单位）
+  const wp = new THREE.Vector3();
+  let best = null, bestDist = 22;
+  for (const p of eventPins) {
+    p.cone.getWorldPosition(wp);
+    const d = raycaster.ray.distanceToPoint(wp);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best ? { object: best.cone, distance: bestDist } : null;
+}
+function showEvtCard(ev) {
+  document.getElementById('evt-title').textContent = `[${ev.type}] ${ev.place}`;
+  document.getElementById('evt-time').textContent = ev.time;
+  const lv = document.getElementById('evt-level');
+  lv.textContent = LEVEL_NAME[ev.level] || '提示';
+  lv.style.color = '#' + new THREE.Color(LEVEL_COLOR[ev.level] || 0x94a3b8).getHexString();
+  document.getElementById('evt-status').textContent = ev.status || '已派单';
+  document.getElementById('evt-dur').textContent = ev.duration || '--';
+  document.getElementById('evt-card').style.display = 'block';
+}
+document.getElementById('evt-close').addEventListener('click', () => {
+  document.getElementById('evt-card').style.display = 'none';
+});
+// 图钉脉冲动画
+(function pinLoop() {
+  requestAnimationFrame(pinLoop);
+  const t = performance.now() / 1000;
+  for (const p of eventPins) {
+    const s = 1 + 0.4 * Math.sin(t * 2.6 + p.phase);
+    p.ring.scale.set(s, s, s);
+    p.ring.material.opacity = Math.max(0.15, 0.95 - (s - 1) * 1.1);
+  }
+})();
+// 种子事件点位
+if (D) D.emergency.events.slice(0, 8).forEach(ev => addEventPin(ev));
+
+/* ---- 专题层 4：环境 AQI 热区 ---- */
+const envLayer = new THREE.Group();
+envLayer.visible = false;
+if (D) {
+  const discGeo = new THREE.CircleGeometry(120, 40);
+  discGeo.rotateX(-Math.PI / 2);
+  const spots = [[0, 0], [-300, -220], [330, 260], [-120, 420], [-550, -520], [560, 460]];
+  const dNames = ['中央商务区', '中城综合区', '滨河居住区', '南部工业区', '山岭生态区', '临港物流区'];
+  spots.forEach(([x, z], i) => {
+    const aqi = Math.round(D.environment.aqi * (0.8 + bldRand(i, 31) * 0.5));
+    const col = aqi <= 50 ? 0x34d399 : aqi <= 100 ? 0xfbbf24 : 0xf87171;
+    const disc = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.22, depthWrite: false,
+    }));
+    const gy = Math.max(terrainHeight(x, z), CITY_Y);
+    disc.position.set(x, gy + 3, z);
+    envLayer.add(disc);
+    const sp = makeLabel(`${dNames[i]} AQI ${aqi}`);
+    sp.scale.set(110, 27.5, 1);
+    sp.position.set(x, gy + 55, z);
+    envLayer.add(sp);
+  });
+}
+scene.add(envLayer);
+
+/* ---- 主题指标面板 ---- */
+const fmtN = (n, d = 0) => Number(n).toLocaleString('zh-CN', { maximumFractionDigits: d, minimumFractionDigits: d });
+function tpRows(rows) {
+  return rows.map(([k, v, cls]) =>
+    `<div class="row"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span></div>`).join('');
+}
+function renderThemePanel() {
+  const t = lastTick || {};
+  const hour = new Date().getHours();
+  const body = document.getElementById('tp-body');
+  const title = document.getElementById('tp-title');
+  if (!D) { body.innerHTML = ''; return; }
+  if (curTheme === 'overview') {
+    title.textContent = '综合态势 · 实时';
+    body.innerHTML = tpRows([
+      ['实时车流', fmtN(Math.round(t.flow || 0)) + ' 辆/h'],
+      ['用电负荷', fmtN(Math.round(t.load || 0)) + ' MW'],
+      ['空气质量', Math.round(t.aqi || D.environment.aqi) + ' AQI'],
+      ['在线设备', fmtN(t.online || 0) + ' 台'],
+      ['在途事件', eventPins.length + ' 起', eventPins.some(p => p.ev.level === 'danger') ? 'danger' : ''],
+    ]);
+  } else if (curTheme === 'traffic') {
+    title.textContent = '交通运行 · 路段着色';
+    const jam = D.traffic.congestionIndex.filter(r => r.index >= 1.7).length;
+    body.innerHTML = tpRows([
+      ['当前平均车速', D.traffic.speed24h[hour] + ' km/h'],
+      ['拥堵路段', jam + ' 条', jam >= 4 ? 'warn' : ''],
+      ['地铁日客运', D.traffic.transit.metroDaily + ' 万人次'],
+      ['公交准点率', D.traffic.transit.busOnTime + '%'],
+      ['图例', '🟩畅通 🟨拥堵 🟥严重'],
+    ]);
+  } else if (curTheme === 'energy') {
+    title.textContent = '能源能耗 · 建筑热力';
+    const green = D.energy.mix.filter(m => ['光伏发电', '风力发电', '水力发电'].includes(m.name))
+      .reduce((a, m) => a + m.value, 0);
+    body.innerHTML = tpRows([
+      ['当前负荷', fmtN(Math.round(t.load || 0)) + ' MW'],
+      ['绿电占比', green.toFixed(1) + '%'],
+      ['储能 SOC', D.energy.storage.soc + '%'],
+      ['今日碳排', fmtN(D.energy.carbon.today) + ' t', 'warn'],
+      ['图例', '🟩低 → 🟥高耗能'],
+    ]);
+  } else if (curTheme === 'emergency') {
+    title.textContent = '应急事件 · 点位分布';
+    const handling = D.emergency.events.filter(e => e.status === '处置中').length;
+    const res = D.emergency.resources;
+    const avail = Math.round(res.reduce((a, r) => a + r.available / r.total, 0) / res.length * 100);
+    body.innerHTML = tpRows([
+      ['今日接报', D.emergency.events.length + ' 起'],
+      ['处置中', handling + ' 起', handling >= 3 ? 'warn' : ''],
+      ['资源可用率', avail + '%'],
+      ['图上点位', eventPins.length + ' 个'],
+      ['操作', '点击图钉看详情'],
+    ]);
+  } else if (curTheme === 'env') {
+    title.textContent = '环境监测 · 分区热区';
+    const wq = D.water.quality.filter(q => q.ok).length;
+    body.innerHTML = tpRows([
+      ['空气质量', Math.round(t.aqi || D.environment.aqi) + ' AQI'],
+      ['水质达标', wq + '/' + D.water.quality.length + ' 项'],
+      ['河道水位', D.water.stations[1].level + ' m'],
+      ['内涝风险点', D.water.floodSpots.filter(f => f.risk === '高').length + ' 处高危', 'warn'],
+      ['近7日AQI均值', Math.round(D.environment.aqiWeek.reduce((a, b) => a + b) / 7)],
+    ]);
+  }
+}
+
+/* ---- 专题切换 ---- */
+function applyTheme(th) {
+  curTheme = th;
+  themeTabs.forEach(b => b.classList.toggle('active', b.dataset.th === th));
+  trafficLayer.visible = th === 'traffic';
+  envLayer.visible = th === 'env';
+  tintBuildingsByEnergy(th === 'energy');
+  renderThemePanel();
+}
+themeTabs.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.th)));
+renderThemePanel();
+
+/* ---- 实时引擎接入：指标刷新 + 新事件落图 ---- */
+if (window.CityLive) {
+  CityLive.on('tick', t => {
+    lastTick = t;
+    if (curTheme !== 'emergency') renderThemePanel();
+  });
+  CityLive.on('event', ev => {
+    addEventPin(ev);
+    const dot = document.getElementById('th-dot-emergency');
+    dot.classList.add('on');
+    setTimeout(() => dot.classList.remove('on'), 6000);
+    if (curTheme === 'emergency') renderThemePanel();
+    else if (curTheme === 'overview') renderThemePanel();
+  });
+  CityLive.start();
+}
+// 测试钩子：直接触发一起事件（供自动化验证）
+window.__fireEvent = ev => addEventPin(ev || { time: '12:00', type: '测试', level: 'warn', place: '测试事件', status: '已派单', duration: '5 分钟' });
+// 测试钩子：以 NDC 坐标拾取事件图钉（供自动化验证）
+window.__pickPin = (nx, ny) => {
+  const hit = pickEventPin(new THREE.Vector2(nx, ny));
+  if (!hit) return null;
+  showEvtCard(hit.object.userData.ev);
+  return { type: hit.object.userData.ev.type, place: hit.object.userData.ev.place };
+};
+// 测试钩子：图钉层诊断
+window.__pinDebug = () => {
+  const v = new THREE.Vector3();
+  const out = {
+    meshes: pinHitMeshes.length,
+    pins: eventPins.map(p => {
+      p.cone.getWorldPosition(v);
+      const s = v.clone().project(camera);
+      return { sx: +s.x.toFixed(2), sy: +s.y.toFixed(2), behind: s.z > 1 };
+    }),
+  };
+  if (eventPins.length) {
+    const p = out.pins[0];
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(new THREE.Vector2(p.sx, p.sy), camera);
+    out.directHits = rc.intersectObjects(pinHitMeshes, false).length;
+    out.anyHits = rc.intersectObjects(eventLayer.children, true).length;
+    const cone = eventPins[0].cone;
+    out.singleCone = rc.intersectObject(cone, false).length;
+    const bs = cone.geometry.boundingSphere;
+    out.bs = bs ? [bs.center.toArray().map(v => +v.toFixed(1)), +bs.radius.toFixed(1)] : null;
+    out.ray = { o: rc.ray.origin.toArray().map(v => Math.round(v)), d: rc.ray.direction.toArray().map(v => +v.toFixed(3)) };
+    const wp = new THREE.Vector3();
+    cone.getWorldPosition(wp);
+    out.coneWorld = wp.toArray().map(v => Math.round(v));
+    // 射线与锥心距
+    out.distRayToCone = +rc.ray.distanceToPoint(wp).toFixed(2);
+  }
+  return out;
 };
 </script>
 </body>

@@ -10,7 +10,7 @@
     { id: 'screen',    href: 'screen.html',    ico: '🖥️', label: '可视化大屏' },
     { group: '运行监测' },
     { id: 'overview',  href: 'index.html',     ico: '📊', label: '态势总览' },
-    { id: 'sandbox',   href: 'sandbox.html',   ico: '🏙️', label: '3D 城市沙盘' },
+    { id: 'sandbox',   href: 'sandbox.html',   ico: '🏙️', label: '数智一张图' },
     { id: 'traffic',   href: 'traffic.html',   ico: '🚦', label: '交通运行' },
     { id: 'energy',    href: 'energy.html',    ico: '⚡', label: '能源与碳排' },
     { id: 'water',     href: 'water.html',     ico: '💧', label: '水务与环境' },
@@ -26,7 +26,7 @@
   const TITLES = {
     screen:    ['指挥中心', '可视化大屏'],
     overview:  ['运行监测', '态势总览'],
-    sandbox:   ['运行监测', '3D 城市沙盘'],
+    sandbox:   ['运行监测', '数智一张图'],
     traffic:   ['运行监测', '交通运行监测'],
     energy:    ['运行监测', '能源与碳排'],
     water:     ['运行监测', '水务与环境'],
