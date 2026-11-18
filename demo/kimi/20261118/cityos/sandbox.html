@@ -89,7 +89,93 @@
     color: var(--text); font-size: 14px; letter-spacing: 2px;
     font-family: "SF Mono", "Consolas", monospace; font-variant-numeric: tabular-nums;
   }
+
+  /* ---------- 数字孪生控制菜单 ---------- */
+  #twin-menu {
+    position: fixed; top: 216px; right: 20px; width: 238px; z-index: 11;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 12px; backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    max-height: calc(100vh - 340px); overflow-y: auto;
+  }
+  #twin-menu .sec { padding: 10px 14px; border-bottom: 1px solid rgba(120,180,255,0.12); }
+  #twin-menu .sec:last-child { border-bottom: none; }
+  #twin-menu .sec-t { font-size: 11px; letter-spacing: 2px; color: var(--text); opacity: 0.85; margin-bottom: 8px; font-weight: 600; }
+  #twin-menu .sec-t::before { content: ""; display: inline-block; width: 3px; height: 10px; background: var(--accent); border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .layer-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; padding: 4px 0; opacity: 0.9; }
+  .layer-row .sw { position: relative; width: 30px; height: 16px; border-radius: 999px; background: rgba(120,180,255,0.2); cursor: pointer; transition: background .15s; flex-shrink: 0; }
+  .layer-row .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #e8f1ff; transition: left .15s; }
+  .layer-row.on .sw { background: var(--accent); }
+  .layer-row.on .sw::after { left: 16px; }
+  .cruise-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cruise-grid button {
+    font-family: inherit; font-size: 11.5px; padding: 6px 0; border-radius: 7px; cursor: pointer;
+    border: 1px solid rgba(120,180,255,0.3); background: rgba(30,50,80,0.45); color: var(--text); transition: all .14s;
+  }
+  .cruise-grid button:hover { border-color: var(--accent); background: rgba(79,195,247,0.2); }
+  #time-slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
+  #time-row { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.85; margin-top: 4px; font-family: "SF Mono", monospace; }
+  #btn-autotime { width: 100%; margin-top: 8px; }
+  /* 建筑信息卡 */
+  #bld-card {
+    position: fixed; bottom: 24px; right: 100px; width: 264px; z-index: 12;
+    background: var(--panel-bg); border: 1px solid var(--accent);
+    border-radius: 12px; backdrop-filter: blur(10px);
+    box-shadow: 0 0 24px rgba(79,195,247,0.25);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 14px 16px; display: none; font-size: 12px;
+  }
+  #bld-card h4 { font-size: 14px; margin-bottom: 8px; letter-spacing: 1px; }
+  #bld-card .row { display: flex; justify-content: space-between; padding: 3px 0; opacity: 0.9; }
+  #bld-card .row .k { opacity: 0.6; }
+  #bld-card .row .v { font-family: "SF Mono", monospace; }
+  #bld-card .tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #bld-card .tg { font-size: 10px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(120,180,255,0.35); color: #a9bcd8; }
+  #bld-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.6; font-size: 14px; }
+  #bld-close:hover { opacity: 1; }
 </style>
+
+<!-- 数字孪生控制菜单 -->
+<div id="twin-menu" class="hud">
+  <div class="sec">
+    <div class="sec-t">图层开关</div>
+    <div id="layer-list"></div>
+  </div>
+  <div class="sec">
+    <div class="sec-t">视角巡航</div>
+    <div class="cruise-grid">
+      <button data-v="city">🌍 全城俯瞰</button>
+      <button data-v="cbd">🏙 中央商务区</button>
+      <button data-v="bridge">🌉 跨河大桥</button>
+      <button data-v="river">🏞 滨河地带</button>
+      <button data-v="hills">⛰ 山岭公园</button>
+      <button data-v="street">🚶 街道漫游</button>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sec-t">时间轴</div>
+    <input type="range" id="time-slider" min="0" max="24" step="0.25" value="12.5" />
+    <div id="time-row"><span>0:00</span><span id="time-cur">12:30</span><span>24:00</span></div>
+    <button class="ctrl-btn" id="btn-autotime">▶ 恢复时间自动流转</button>
+  </div>
+  <div class="sec" style="font-size:11px;opacity:0.6;line-height:1.7">
+    💡 点击任意建筑可查看其数字孪生档案
+  </div>
+</div>
+
+<!-- 建筑孪生信息卡 -->
+<div id="bld-card">
+  <span id="bld-close">✕</span>
+  <h4 id="bld-name">--</h4>
+  <div class="row"><span class="k">所属城区</span><span class="v" id="bld-dist">--</span></div>
+  <div class="row"><span class="k">建筑高度</span><span class="v" id="bld-h">--</span></div>
+  <div class="row"><span class="k">楼层数</span><span class="v" id="bld-f">--</span></div>
+  <div class="row"><span class="k">今日能耗</span><span class="v" id="bld-e">--</span></div>
+  <div class="row"><span class="k">入驻率</span><span class="v" id="bld-o">--</span></div>
+  <div class="tags" id="bld-tags"></div>
+</div>
+
 <script type="importmap">
 {
   "imports": {
@@ -223,7 +309,11 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87b5d9);
 scene.fog = new THREE.FogExp2(0x87b5d9, 0.0011);
 
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 6000);
+function viewportAspect() {
+  const w = window.innerWidth, h = window.innerHeight;
+  return (w > 0 && h > 0) ? w / h : 16 / 9;
+}
+const camera = new THREE.PerspectiveCamera(55, viewportAspect(), 0.5, 6000);
 const CAM_HOME = new THREE.Vector3(560, 420, 560);
 camera.position.copy(CAM_HOME);
 
@@ -873,11 +963,223 @@ requestAnimationFrame(() => {
   setTimeout(() => ld.remove(), 900);
 });
 
+
+/* ============================================================
+ * 14. 数字孪生交互层：图层 / 巡航 / 时间轴 / 建筑拾取
+ * ============================================================ */
+
+/* ---- 城区标注精灵 ---- */
+const labelsGroup = new THREE.Group();
+function makeLabel(text) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(8, 14, 26, 0.72)';
+  g.strokeStyle = 'rgba(79, 195, 247, 0.8)';
+  g.lineWidth = 3;
+  const r = 14;
+  g.beginPath();
+  g.roundRect(4, 4, 248, 56, r);
+  g.fill(); g.stroke();
+  g.fillStyle = '#e8f1ff';
+  g.font = 'bold 30px "PingFang SC", "Microsoft YaHei", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 128, 34);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(150, 37.5, 1);
+  return sp;
+}
+[
+  ['中央商务区', 0, 200, 0],
+  ['中城综合区', -300, 140, -220],
+  ['滨河居住区', 330, 140, 260],
+  ['南部工业区', -120, 110, 420],
+  ['山岭生态区', -550, 300, -520],
+  ['临港物流区', 560, 110, 460],
+].forEach(([name, x, y, z]) => {
+  const sp = makeLabel(name);
+  sp.position.set(x, y, z);
+  labelsGroup.add(sp);
+});
+scene.add(labelsGroup);
+
+/* ---- 图层开关 ---- */
+const LAYERS = [
+  ['建筑', buildings], ['屋顶设施', roofMesh], ['绿化树木', trees],
+  ['车流', cars], ['水面', water], ['云朵', cloudGroup],
+  ['路灯', lamps], ['城区标注', labelsGroup],
+];
+{
+  const box = document.getElementById('layer-list');
+  LAYERS.forEach(([name, obj]) => {
+    const row = document.createElement('div');
+    row.className = 'layer-row on';
+    row.innerHTML = `<span>${name}</span><span class="sw"></span>`;
+    row.querySelector('.sw').addEventListener('click', () => {
+      obj.visible = !obj.visible;
+      row.classList.toggle('on', obj.visible);
+    });
+    box.appendChild(row);
+  });
+}
+
+/* ---- 视角巡航 ---- */
+let camTween = null;
+function flyTo(p1, t1, dur = 1800) {
+  camTween = {
+    p0: camera.position.clone(), q0: controls.target.clone(),
+    p1: new THREE.Vector3(...p1), t1: new THREE.Vector3(...t1),
+    s: performance.now(), dur,
+  };
+}
+const VIEWS = {
+  city:   { p: [560, 420, 560],   t: [0, 20, 0] },
+  cbd:    { p: [170, 130, 170],   t: [0, 80, 0] },
+  bridge: { p: [290, 95, 140],    t: [119, 16, 0] },
+  river:  { p: [-120, 130, 420],  t: [230, 12, 280] },
+  hills:  { p: [-780, 420, -620], t: [-350, 160, -350] },
+  street: { p: [60, 16, 60],      t: [-80, 22, -40] },
+};
+document.querySelectorAll('.cruise-grid button').forEach(b => {
+  b.addEventListener('click', () => {
+    const v = VIEWS[b.dataset.v];
+    if (v) flyTo(v.p, v.t);
+  });
+});
+(function tweenLoop() {
+  requestAnimationFrame(tweenLoop);
+  if (!camTween) return;
+  const k = Math.min(1, (performance.now() - camTween.s) / camTween.dur);
+  const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+  camera.position.lerpVectors(camTween.p0, camTween.p1, e);
+  controls.target.lerpVectors(camTween.q0, camTween.t1, e);
+  if (k >= 1) camTween = null;
+})();
+
+/* ---- 时间轴 ---- */
+{
+  const slider = document.getElementById('time-slider');
+  const cur = document.getElementById('time-cur');
+  slider.addEventListener('input', () => {
+    timeOfDay = parseFloat(slider.value);
+    autoCycle = false;
+    applyTimeOfDay();
+    const hh = Math.floor(timeOfDay), mm = Math.floor((timeOfDay - hh) * 60);
+    cur.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  });
+  document.getElementById('btn-autotime').addEventListener('click', () => {
+    autoCycle = true;
+  });
+}
+
+/* ---- 建筑拾取（数字孪生档案） ---- */
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+let downPos = null;
+const BLD_NAMES = ['云璟', '汇峰', '天誉', '澜庭', '星澜', '锦宸', '朗润', '嘉禾', '璞悦', '晟世'];
+const BLD_SUFFIX = ['中心', '大厦', '广场', '国际', '公馆', '塔', '天地', '汇'];
+const DIST_NAME = { cbd: '中央商务区', midtown: '中城综合区', industrial: '南部工业区', residential: '滨河居住区' };
+
+const hlBox = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.06, 1.02, 1.06)),
+  new THREE.LineBasicMaterial({ color: 0x4fc3f7 })
+);
+hlBox.visible = false;
+scene.add(hlBox);
+
+function bldRand(id, salt) {
+  const x = Math.sin(id * 127.1 + salt * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+function showBldCard(id, m) {
+  const pos = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  m.decompose(pos, q, s);
+  const dist = districtOf(pos.x, pos.z);
+  const h = Math.round(s.y);
+  const name = BLD_NAMES[Math.floor(bldRand(id, 1) * BLD_NAMES.length)] +
+               BLD_SUFFIX[Math.floor(bldRand(id, 2) * BLD_SUFFIX.length)] +
+               ' · T' + (1 + Math.floor(bldRand(id, 3) * 5));
+  document.getElementById('bld-name').textContent = name;
+  document.getElementById('bld-dist').textContent = DIST_NAME[dist] || '滨河居住区';
+  document.getElementById('bld-h').textContent = h + ' m';
+  document.getElementById('bld-f').textContent = Math.max(2, Math.round(h / 4.2)) + ' F';
+  document.getElementById('bld-e').textContent = Math.round(800 + bldRand(id, 4) * 9200) + ' kWh';
+  document.getElementById('bld-o').textContent = Math.round(58 + bldRand(id, 5) * 40) + ' %';
+  const tags = [];
+  if (h > 150) tags.push('超高层');
+  if (bldRand(id, 6) > 0.55) tags.push('绿建三星');
+  if (bldRand(id, 7) > 0.6) tags.push('光伏屋面');
+  if (dist === 'cbd') tags.push('重点监测');
+  tags.push('孪生体 #' + id);
+  document.getElementById('bld-tags').innerHTML = tags.map(t => `<span class="tg">${t}</span>`).join('');
+  document.getElementById('bld-card').style.display = 'block';
+  // 高亮框
+  hlBox.position.copy(pos);
+  hlBox.scale.copy(s);
+  hlBox.visible = true;
+}
+document.getElementById('bld-close').addEventListener('click', () => {
+  document.getElementById('bld-card').style.display = 'none';
+  hlBox.visible = false;
+});
+renderer.domElement.addEventListener('pointerdown', e => { downPos = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]);
+  downPos = null;
+  if (moved > 5) return; // 拖拽不算点击
+  const r = renderer.domElement.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return;
+  pointerNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  const hit = pickBuilding(pointerNDC);
+  if (hit) {
+    const m = new THREE.Matrix4();
+    buildings.getMatrixAt(hit.instanceId, m);
+    showBldCard(hit.instanceId, m);
+  }
+});
+function pickBuilding(ndc) {
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObject(buildings, false);
+  return hits.length ? hits[0] : null;
+}
+// 射线诊断钩子（供自动化验证）
+window.__rayTest = (nx, ny) => {
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(new THREE.Vector2(nx, ny), camera);
+  return {
+    o: rc.ray.origin.toArray().map(v => Math.round(v)),
+    d: rc.ray.direction.toArray().map(v => +v.toFixed(3)),
+    cam: camera.position.toArray().map(v => Math.round(v)),
+    tgt: controls.target.toArray().map(v => Math.round(v)),
+    tHits: rc.intersectObject(terrain, false).length,
+    bHits: rc.intersectObject(buildings, false).length,
+    wHits: rc.intersectObject(water, false).length,
+  };
+};
+// 测试钩子：以 NDC 坐标直接拾取（供自动化验证）
+window.__pickTest = (nx, ny) => {
+  const hit = pickBuilding(new THREE.Vector2(nx, ny));
+  if (!hit) return null;
+  const m = new THREE.Matrix4();
+  buildings.getMatrixAt(hit.instanceId, m);
+  showBldCard(hit.instanceId, m);
+  return { id: hit.instanceId, dist: +hit.distance.toFixed(1) };
+};
+
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect = viewportAspect();
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+// 测试钩子：强制设定视口尺寸（供无头/零视口环境验证）
+window.__forceSize = (w, h) => {
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+};
 </script>
 </body>
 </html>
