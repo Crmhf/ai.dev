@@ -29,6 +29,7 @@
       <div class="page-head">
         <h2>数据分析</h2>
         <span class="desc">感知数据检索 · 交叉分析 · 导出</span>
+        <span id="drill-chip" style="display:none" class="tag info">下钻自 态势总览</span>
         <div class="actions">
           <button class="btn sm" id="btn-csv">⬇ 导出 CSV</button>
           <button class="btn sm" onclick="window.print()">🖨 打印报表</button>
@@ -170,6 +171,25 @@ let page = 1, sortKey = 'id', sortDir = 1;
   const kinds = [...new Set(D.sensors.map(s => s.kind))];
   kinds.forEach(k => H.$('#f-kind').insertAdjacentHTML('beforeend', `<option>${k}</option>`));
   D.DISTRICTS.forEach(d => H.$('#f-district').insertAdjacentHTML('beforeend', `<option>${d.name}</option>`));
+}
+/* 跨页下钻：?district=xx&from=overview → 预设城区筛选并显示下钻标记 */
+{
+  const qs = new URLSearchParams(location.search);
+  const dist = qs.get('district');
+  if (dist && D.DISTRICTS.some(d => d.name === dist)) {
+    H.$('#f-district').value = dist;
+    const chip = H.$('#drill-chip');
+    chip.style.display = '';
+    chip.textContent = `下钻自 ${qs.get('from') === 'overview' ? '态势总览' : '外部链接'} · ${dist} ✕`;
+    chip.style.cursor = 'pointer';
+    chip.title = '点击清除下钻筛选';
+    chip.addEventListener('click', () => {
+      chip.style.display = 'none';
+      H.$('#f-district').value = '';
+      page = 1; render();
+      history.replaceState(null, '', 'data.html');
+    });
+  }
 }
 function filtered() {
   const k = H.$('#f-kind').value, dt = H.$('#f-district').value,

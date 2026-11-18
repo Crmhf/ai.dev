@@ -5,6 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>交通运行 · 梅塔维尔 CityOS</title>
 <link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  /* 道路画像弹层 */
+  .road-modal-mask {
+    position: fixed; inset: 0; z-index: 300; display: none;
+    background: rgba(4, 8, 18, 0.66); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center;
+  }
+  .road-modal-mask.open { display: flex; }
+  .road-modal {
+    width: 640px; max-width: 92vw; background: rgba(10, 17, 32, 0.97);
+    border: 1px solid var(--border-strong); border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6); overflow: hidden;
+    animation: panelIn 0.22s ease;
+  }
+  @keyframes panelIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+  .road-modal .rm-head {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .road-modal .rm-head h3 { font-size: 15px; margin: 0; }
+  .road-modal .rm-close { margin-left: auto; cursor: pointer; color: var(--text-low); font-size: 16px; padding: 2px 8px; border-radius: 6px; }
+  .road-modal .rm-close:hover { color: var(--text-hi); background: rgba(120,180,255,0.1); }
+  .road-modal .rm-stats { display: flex; gap: 26px; padding: 12px 18px 0; font-size: 12px; color: var(--text-mid); flex-wrap: wrap; }
+  .road-modal .rm-stats b { color: var(--text-hi); font-family: var(--mono); margin-left: 4px; }
+  .road-modal .rm-body { padding: 6px 12px 14px; }
+  #tbl-road tbody tr { cursor: pointer; transition: background 0.15s; }
+  #tbl-road tbody tr:hover { background: rgba(120, 180, 255, 0.07); }
+</style>
 </head>
 <body>
 <div class="layout">
@@ -32,7 +60,7 @@
           <div class="p-body"><div class="chart tall" id="ch-flow"></div></div>
         </div>
         <div class="panel">
-          <div class="p-head"><span class="p-title">重点道路拥堵榜</span><span class="p-extra">实时指数</span></div>
+          <div class="p-head"><span class="p-title">重点道路拥堵榜</span><span class="p-extra">实时指数 · 点击行查看道路画像</span></div>
           <div class="p-body flush tbl-wrap" style="max-height:352px">
             <table class="tbl" id="tbl-road">
               <thead><tr><th>道路</th><th>等级</th><th class="num">车速 km/h</th><th class="num">流量 辆/h</th><th>状态</th></tr></thead>
@@ -81,6 +109,19 @@
       </div>
 
     </main>
+  </div>
+</div>
+
+<!-- 道路画像弹层 -->
+<div class="road-modal-mask" id="road-modal">
+  <div class="road-modal">
+    <div class="rm-head">
+      <h3 id="rm-name">--</h3>
+      <span id="rm-tag"></span>
+      <span class="rm-close" id="rm-close">✕</span>
+    </div>
+    <div class="rm-stats" id="rm-stats"></div>
+    <div class="rm-body"><div class="chart" id="rm-chart" style="height:260px"></div></div>
   </div>
 </div>
 
@@ -137,7 +178,7 @@ H.makeChart(H.$('#ch-flow'), {
   ],
 });
 
-/* ---------- 拥堵榜 ---------- */
+/* ---------- 拥堵榜（点击行 → 道路画像弹层） ---------- */
 {
   const tb = H.$('#tbl-road tbody');
   [...D.traffic.congestionIndex].sort((a, b) => b.index - a.index).forEach(r => {
@@ -145,9 +186,50 @@ H.makeChart(H.$('#ch-flow'), {
     tr.innerHTML = `<td>${r.name}</td><td class="dim">${r.level}</td>
       <td class="num">${r.speed}</td><td class="num">${H.fmt(r.flow)}</td>
       <td>${H.tag(r.status + ' ' + r.index.toFixed(2), H.LEVEL_TAG[r.status])}</td>`;
+    tr.title = '查看 ' + r.name + ' 24h 道路画像';
+    tr.addEventListener('click', () => openRoadProfile(r));
     tb.appendChild(tr);
   });
 }
+
+/* ---------- 道路画像弹层 ---------- */
+let rmChart = null;
+function openRoadProfile(r) {
+  const mask = H.$('#road-modal');
+  H.$('#rm-name').textContent = r.name;
+  H.$('#rm-tag').innerHTML = H.tag(r.status, H.LEVEL_TAG[r.status]);
+  H.$('#rm-stats').innerHTML = `
+    <span>道路等级<b>${r.level}</b></span>
+    <span>当前车速<b>${r.speed} km/h</b></span>
+    <span>当前流量<b>${H.fmt(r.flow)} 辆/h</b></span>
+    <span>拥堵指数<b>${r.index.toFixed(2)}</b></span>`;
+  mask.classList.add('open');
+  // 以全城流量曲线形状 × 当前流量标定 + 种子噪声，合成该道路 24h 画像
+  const cityAvg = D.traffic.flow24h.reduce((a, b) => a + b) / 24;
+  const citySpdAvg = D.traffic.speed24h.reduce((a, b) => a + b) / 24;
+  const rnd = D._util.rand;
+  const flow24 = D.traffic.flow24h.map(f => Math.round(r.flow * (f / cityAvg) * (0.92 + rnd() * 0.16)));
+  const speed24 = D.traffic.speed24h.map(s => +(r.speed * (s / citySpd) * (0.94 + rnd() * 0.12)).toFixed(1));
+  const opt = {
+    xAxis: { type: 'category', data: hours, boundaryGap: false },
+    yAxis: [
+      { type: 'value', name: '辆/h' },
+      { type: 'value', name: 'km/h', min: 0, splitLine: { show: false } },
+    ],
+    legend: { show: true },
+    series: [
+      { name: '流量', type: 'line', smooth: true, symbol: 'none', data: flow24,
+        lineStyle: { width: 2.5 }, areaStyle: { opacity: 0.15 } },
+      { name: '车速', type: 'line', smooth: true, symbol: 'none', yAxisIndex: 1, data: speed24,
+        lineStyle: { width: 2, type: 'dashed', color: '#34d399' }, itemStyle: { color: '#34d399' } },
+    ],
+  };
+  if (!rmChart) rmChart = H.makeChart(H.$('#rm-chart'), opt);
+  else { rmChart.setOption(opt, true); setTimeout(() => rmChart.resize(), 30); }
+}
+H.$('#rm-close').addEventListener('click', () => H.$('#road-modal').classList.remove('open'));
+H.$('#road-modal').addEventListener('click', e => { if (e.target.id === 'road-modal') e.target.classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') H.$('#road-modal').classList.remove('open'); });
 
 /* ---------- 轨道交通 ---------- */
 {

@@ -156,20 +156,28 @@ H.$('#pulse-seg').addEventListener('click', e => {
   renderPulse(b.dataset.k);
 });
 
-/* ---------- 城区人口与面积 ---------- */
-H.makeChart(H.$('#ch-district'), {
+/* ---------- 城区人口与面积（点击柱体下钻至数据分析） ---------- */
+const dcChart = H.makeChart(H.$('#ch-district'), {
   xAxis: { type: 'category', data: D.DISTRICTS.map(d => d.short) },
   yAxis: [
     { type: 'value', name: '万人' },
     { type: 'value', name: 'km²', splitLine: { show: false } },
   ],
   series: [
-    { name: '常住人口', type: 'bar', data: D.DISTRICTS.map(d => d.pop), barWidth: 18,
+    { name: '常住人口', type: 'bar', data: D.DISTRICTS.map(d => d.pop), barWidth: 18, cursor: 'pointer',
       itemStyle: { borderRadius: [4, 4, 0, 0], color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#4fc3f7' }, { offset: 1, color: '#4fc3f722' }] } } },
     { name: '辖区面积', type: 'line', yAxisIndex: 1, smooth: true, data: D.DISTRICTS.map(d => d.area),
       symbolSize: 7, lineStyle: { width: 2, color: '#7c5cff' }, itemStyle: { color: '#7c5cff' } },
   ],
 });
+if (dcChart) {
+  dcChart.on('click', p => {
+    const d = D.DISTRICTS[p.dataIndex];
+    if (d) location.href = 'data.html?district=' + encodeURIComponent(d.name) + '&from=overview';
+  });
+  const hint = H.$('#ch-district').closest('.panel').querySelector('.p-extra');
+  if (hint) hint.innerHTML = '六区对比 · <span style="color:var(--accent)">点击柱体下钻 ▾</span>';
+}
 
 /* ---------- 能源结构饼图 ---------- */
 H.makeChart(H.$('#ch-mix'), {
