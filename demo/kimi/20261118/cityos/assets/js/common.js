@@ -6,6 +6,8 @@
   'use strict';
 
   const NAV = [
+    { group: '指挥中心' },
+    { id: 'screen',    href: 'screen.html',    ico: '🖥️', label: '可视化大屏' },
     { group: '运行监测' },
     { id: 'overview',  href: 'index.html',     ico: '📊', label: '态势总览' },
     { id: 'sandbox',   href: 'sandbox.html',   ico: '🏙️', label: '3D 城市沙盘' },
@@ -19,6 +21,7 @@
   ];
 
   const TITLES = {
+    screen:    ['指挥中心', '可视化大屏'],
     overview:  ['运行监测', '态势总览'],
     sandbox:   ['运行监测', '3D 城市沙盘'],
     traffic:   ['运行监测', '交通运行监测'],
