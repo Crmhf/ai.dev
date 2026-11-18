@@ -136,6 +136,13 @@
   #bld-close:hover { opacity: 1; }
 </style>
 
+
+<!-- 区域统计结果卡 -->
+<div id="ana-card" style="display:none;position:fixed;bottom:24px;left:20px;width:264px;z-index:12;background:rgba(10,16,28,0.72);border:1px solid rgba(251,191,36,0.5);border-radius:12px;backdrop-filter:blur(10px);box-shadow:0 0 24px rgba(251,191,36,0.2);color:#e8f1ff;font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:14px 16px;font-size:12px">
+  <h4 style="font-size:14px;margin-bottom:8px;letter-spacing:1px">⭕ 区域统计</h4>
+  <div id="ana-card-body"></div>
+</div>
+
 <!-- 数字孪生控制菜单 -->
 <div id="twin-menu" class="hud">
   <div class="sec">
@@ -158,6 +165,18 @@
     <input type="range" id="time-slider" min="0" max="24" step="0.25" value="12.5" />
     <div id="time-row"><span>0:00</span><span id="time-cur">12:30</span><span>24:00</span></div>
     <button class="ctrl-btn" id="btn-autotime">▶ 恢复时间自动流转</button>
+  </div>
+  <div class="sec">
+    <div class="sec-t">空间分析</div>
+    <div class="cruise-grid">
+      <button id="ana-measure">📏 测距</button>
+      <button id="ana-region">⭕ 区域统计</button>
+      <button id="ana-clear" style="grid-column:span 2">🧹 清除分析标记</button>
+    </div>
+    <div id="ana-radius-row" style="display:none;margin-top:8px">
+      <div style="font-size:11px;opacity:0.75;margin-bottom:4px">统计半径 <span id="ana-radius-val" class="mono">150</span> m</div>
+      <input type="range" id="ana-radius" min="60" max="420" step="10" value="150" style="width:100%;accent-color:#4fc3f7" />
+    </div>
   </div>
   <div class="sec" style="font-size:11px;opacity:0.6;line-height:1.7">
     💡 点击任意建筑可查看其数字孪生档案
@@ -1133,6 +1152,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   const r = renderer.domElement.getBoundingClientRect();
   if (r.width === 0 || r.height === 0) return;
   pointerNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  if (window.__analysisClick && window.__analysisClick(pointerNDC)) return;
   const hit = pickBuilding(pointerNDC);
   if (hit) {
     const m = new THREE.Matrix4();
@@ -1167,6 +1187,123 @@ window.__pickTest = (nx, ny) => {
   buildings.getMatrixAt(hit.instanceId, m);
   showBldCard(hit.instanceId, m);
   return { id: hit.instanceId, dist: +hit.distance.toFixed(1) };
+};
+
+
+/* ============================================================
+ * 15. 空间分析：测距 + 圆形区域统计
+ * ============================================================ */
+const anaGroup = new THREE.Group();
+scene.add(anaGroup);
+let anaMode = null;            // 'measure' | 'region' | null
+let measurePts = [];
+let regionCenter = null;
+let regionCircle = null;
+const anaMarkerGeo = new THREE.SphereGeometry(3, 12, 12);
+const anaMarkerMat = new THREE.MeshBasicMaterial({ color: 0x4fc3f7 });
+
+function groundPoint(ndc) {
+  raycaster.setFromCamera(ndc, camera);
+  const hit = raycaster.intersectObject(terrain, false)[0];
+  return hit ? hit.point : null;
+}
+function anaLabel(text, pos) {
+  const sp = makeLabel(text);
+  sp.scale.set(120, 30, 1);
+  sp.position.copy(pos).y += 16;
+  anaGroup.add(sp);
+  return sp;
+}
+function setMode(m) {
+  anaMode = m;
+  document.getElementById('ana-measure').classList.toggle('active', m === 'measure');
+  document.getElementById('ana-region').classList.toggle('active', m === 'region');
+  document.getElementById('ana-radius-row').style.display = m === 'region' ? 'block' : 'none';
+  renderer.domElement.style.cursor = m ? 'crosshair' : '';
+}
+document.getElementById('ana-measure').addEventListener('click', () => {
+  measurePts = [];
+  setMode(anaMode === 'measure' ? null : 'measure');
+});
+document.getElementById('ana-region').addEventListener('click', () => {
+  setMode(anaMode === 'region' ? null : 'region');
+});
+document.getElementById('ana-clear').addEventListener('click', () => {
+  anaGroup.clear();
+  measurePts = [];
+  regionCenter = null;
+  regionCircle = null;
+  document.getElementById('ana-card').style.display = 'none';
+  setMode(null);
+});
+document.getElementById('ana-radius').addEventListener('input', e => {
+  document.getElementById('ana-radius-val').textContent = e.target.value;
+  if (regionCenter) buildRegion(regionCenter, parseInt(e.target.value));
+});
+
+function buildRegion(center, radius) {
+  // 重绘圆
+  if (regionCircle) { anaGroup.remove(regionCircle); regionCircle.geometry.dispose(); }
+  const pts = [];
+  for (let i = 0; i <= 72; i++) {
+    const a = i / 72 * Math.PI * 2;
+    const x = center.x + Math.cos(a) * radius;
+    const z = center.z + Math.sin(a) * radius;
+    pts.push(new THREE.Vector3(x, terrainHeight(x, z) + 2, z));
+  }
+  regionCircle = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xfbbf24 })
+  );
+  anaGroup.add(regionCircle);
+  // 统计
+  let cnt = 0, totalH = 0, totalE = 0;
+  const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+  for (let i = 0; i < buildings.count; i++) {
+    buildings.getMatrixAt(i, m);
+    m.decompose(p, q, s);
+    if (Math.hypot(p.x - center.x, p.z - center.z) <= radius) {
+      cnt += 1;
+      totalH += s.y;
+      totalE += Math.round(800 + bldRand(i, 4) * 9200);
+    }
+  }
+  const card = document.getElementById('ana-card');
+  card.style.display = 'block';
+  document.getElementById('ana-card-body').innerHTML = `
+    <div class="row"><span class="k">统计半径</span><span class="v">${radius} m</span></div>
+    <div class="row"><span class="k">区域内建筑</span><span class="v">${cnt} 栋</span></div>
+    <div class="row"><span class="k">平均高度</span><span class="v">${cnt ? Math.round(totalH / cnt) : 0} m</span></div>
+    <div class="row"><span class="k">建筑总面积(估)</span><span class="v">${(totalH * 4.2 / 10).toFixed(0)}k m²</span></div>
+    <div class="row"><span class="k">今日能耗(估)</span><span class="v">${totalE.toLocaleString()} kWh</span></div>
+    <div class="row"><span class="k">区域类型</span><span class="v">${DIST_NAME[districtOf(center.x, center.z)] || '城市边缘'}</span></div>`;
+}
+
+window.__analysisClick = (ndc) => {
+  if (!anaMode) return false;
+  const p = groundPoint(ndc);
+  if (!p) return true;
+  if (anaMode === 'measure') {
+    measurePts.push(p.clone());
+    const mk = new THREE.Mesh(anaMarkerGeo, anaMarkerMat);
+    mk.position.copy(p).y += 2;
+    anaGroup.add(mk);
+    if (measurePts.length === 2) {
+      const [a, b] = measurePts;
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        a.clone().setY(a.y + 2), b.clone().setY(b.y + 2),
+      ]);
+      anaGroup.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x4fc3f7 })));
+      const dist = a.distanceTo(b);
+      anaLabel(`📏 ${Math.round(dist)} m`, a.clone().lerp(b, 0.5));
+      measurePts = [];
+    }
+  } else if (anaMode === 'region') {
+    regionCenter = p.clone();
+    const radius = parseInt(document.getElementById('ana-radius').value);
+    buildRegion(regionCenter, radius);
+  }
+  return true;
 };
 
 window.addEventListener('resize', () => {
