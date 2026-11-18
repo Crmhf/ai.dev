@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>水务与环境 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>水务与环境监测</h2>
+        <span class="desc">水文 · 雨量 · 水质 · 泵站 · 内涝</span>
+        <div class="actions">
+          <span class="tag warn" id="hd-warn">--</span>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <!-- 水文站卡片 -->
+      <div class="grid g-3" id="station-row"></div>
+
+      <div class="grid g-21 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">水位过程线（24h）</span><span class="p-extra">三站对比 · 警戒水位线</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-level"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">逐时雨量</span><span class="p-extra">mm · 今日</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-rain"></div></div>
+        </div>
+      </div>
+
+      <div class="grid g-3 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">河道水质</span><span class="p-extra" id="wq-grade">--</span></div>
+          <div class="p-body" id="wq-list"></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">泵站运行</span><span class="p-extra">6 座</span></div>
+          <div class="p-body flush tbl-wrap" style="max-height:280px">
+            <table class="tbl" id="tbl-pump">
+              <thead><tr><th>泵站</th><th class="num">流量 m³/h</th><th>状态</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">内涝风险点</span><span class="p-extra">强降水联动</span></div>
+          <div class="p-body flush tbl-wrap" style="max-height:280px">
+            <table class="tbl" id="tbl-flood">
+              <thead><tr><th>点位</th><th>风险</th><th class="num">积水 cm</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/live.js"></script>
+<script>
+CityOS.mount('water');
+const D = CITY_DATA, H = CityOS;
+const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
+
+/* ---------- 顶部预警角标 ---------- */
+{
+  const hi = D.water.floodSpots.filter(f => f.risk === '高').length;
+  const maxRain = Math.max(...D.water.rain24h);
+  H.$('#hd-warn').textContent = `高风险涝点 ${hi} 处 · 最大时雨量 ${maxRain.toFixed(1)} mm`;
+}
+
+/* ---------- 水文站卡片（含实时水位微涨落） ---------- */
+{
+  const row = H.$('#station-row');
+  D.water.stations.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'panel kpi';
+    const pct = s.riskPct;
+    const cls = pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : 'ok';
+    card.innerHTML = `
+      <div class="k-label">${s.name}</div>
+      <div class="k-value"><span id="st-v${i}">${s.level.toFixed(2)}</span><span class="unit">m</span></div>
+      <div class="flex mt" style="gap:8px">
+        <div class="bar ${cls}" style="flex:1"><i style="width:${pct}%"></i></div>
+        <span class="mono dim" style="font-size:11px">${pct}%</span>
+      </div>
+      <div class="k-trend flat">警戒水位 ${s.warn.toFixed(2)} m · 距警戒 ${(s.warn - s.level).toFixed(2)} m</div>`;
+    row.appendChild(card);
+  });
+}
+
+/* ---------- 水位过程线 ---------- */
+H.makeChart(H.$('#ch-level'), {
+  xAxis: { type: 'category', data: hours, boundaryGap: false },
+  yAxis: { type: 'value', name: 'm', scale: true },
+  series: [
+    ...D.water.stations.map((s, i) => ({
+      name: ['上游站', '城区闸口', '的溪站'][i], type: 'line', smooth: true, symbol: 'none',
+      data: s.trend, lineStyle: { width: 2 },
+    })),
+    {
+      name: '城区警戒线', type: 'line', data: Array(24).fill(D.water.stations[1].warn),
+      symbol: 'none', silent: true,
+      lineStyle: { color: '#f87171', type: 'dashed', width: 1.5 },
+      itemStyle: { color: '#f87171' },
+    },
+  ],
+});
+
+/* ---------- 雨量 ---------- */
+H.makeChart(H.$('#ch-rain'), {
+  xAxis: { type: 'category', data: hours },
+  yAxis: { type: 'value', name: 'mm' },
+  series: [{
+    type: 'bar', data: D.water.rain24h.map(v => ({
+      value: v,
+      itemStyle: { color: v >= 10 ? '#f87171' : v >= 5 ? '#fbbf24' : '#4fc3f7', borderRadius: [3, 3, 0, 0] },
+    })),
+    barWidth: '55%',
+    markLine: {
+      silent: true, symbol: 'none',
+      lineStyle: { color: '#fbbf24', type: 'dashed' },
+      data: [{ yAxis: 10, label: { formatter: '大雨阈值', color: '#fbbf24', fontSize: 10 } }],
+    },
+  }],
+});
+
+/* ---------- 水质 ---------- */
+{
+  H.$('#wq-grade').textContent = '综合 ' + D.environment.waterQuality;
+  const box = H.$('#wq-list');
+  D.water.quality.forEach(q => {
+    const row = document.createElement('div');
+    row.className = 'flex-between';
+    row.style.padding = '8px 0';
+    row.style.borderBottom = '1px solid rgba(120,180,255,0.07)';
+    row.innerHTML = `<span>${q.name}</span>
+      <span class="dim" style="font-size:11px">标准 ${q.std}</span>
+      <span class="mono">${q.value}</span>
+      ${H.tag('达标', 'ok')}`;
+    box.appendChild(row);
+  });
+  const note = document.createElement('div');
+  note.className = 'dim mt';
+  note.style.fontSize = '11px';
+  note.textContent = '采样点：城区闸口自动监测站 · 每 4 小时更新';
+  box.appendChild(note);
+}
+
+/* ---------- 泵站 ---------- */
+{
+  const tb = H.$('#tbl-pump tbody');
+  D.water.pumps.forEach(p => {
+    const tagCls = p.status === '运行' ? 'ok' : p.status === '待机' ? 'mute' : 'warn';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.name}</td>
+      <td class="num">${p.status === '运行' ? p.flow : '--'}</td>
+      <td>${H.tag(p.status, tagCls)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------- 内涝风险 ---------- */
+{
+  const tb = H.$('#tbl-flood tbody');
+  D.water.floodSpots.forEach(f => {
+    const cls = f.risk === '高' ? 'danger' : f.risk === '中' ? 'warn' : 'ok';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${f.place}</td><td>${H.tag(f.risk + '风险', cls)}</td>
+      <td class="num" data-depth>${f.depth}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------- 实时联动：强降水时水位缓涨、积水加深 ---------- */
+{
+  const cells = document.querySelectorAll('[data-depth]');
+  CityLive.on('tick', t => {
+    D.water.stations.forEach((s, i) => {
+      const el = document.getElementById('st-v' + i);
+      if (el) el.textContent = (s.level + Math.sin(t.ts / 9000 + i) * 0.03).toFixed(2);
+    });
+    cells.forEach(c => {
+      const base = parseInt(c.textContent);
+      if (Math.random() < 0.4) c.textContent = Math.max(0, base + (Math.random() < 0.5 ? 1 : -1));
+    });
+  });
+  CityLive.start();
+}
+</script>
+</body>
+</html>
