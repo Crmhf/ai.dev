@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>预测研判 · 梅塔维尔 CityOS</title>
+<link rel="stylesheet" href="assets/css/main.css" />
+<style>
+  .rule-card {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 12px;
+    background: rgba(10, 16, 28, 0.45);
+    transition: border-color .2s;
+  }
+  .rule-card.firing { border-color: var(--danger); box-shadow: 0 0 16px rgba(248,113,113,0.25); }
+  .rule-card.off { opacity: 0.45; }
+  .rule-card .head { display: flex; align-items: center; gap: 10px; }
+  .rule-card .name { font-size: 13px; font-weight: 600; }
+  .rule-card .state { margin-left: auto; }
+  .rule-card .body { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+  .rule-card input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  .rule-card .val { font-family: var(--mono); font-size: 12px; width: 92px; text-align: right; color: var(--accent); }
+  .rule-card .cur { font-family: var(--mono); font-size: 11px; color: var(--text-low); width: 110px; }
+  .switch { position: relative; width: 34px; height: 18px; border-radius: 999px; background: rgba(120,180,255,0.2); cursor: pointer; flex-shrink: 0; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #e8f1ff; transition: left .15s; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: 18px; }
+  #alert-strip {
+    display: none; padding: 10px 16px; margin-bottom: 16px; border-radius: 10px;
+    border: 1px solid rgba(248,113,113,0.45);
+    background: linear-gradient(90deg, rgba(248,113,113,0.14), transparent 70%);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+
+      <div class="page-head">
+        <h2>预测研判工作台</h2>
+        <span class="desc">AI 短期预测 · 可配置预警规则引擎</span>
+        <div class="actions">
+          <span class="tag info" id="hd-alarm">--</span>
+          <a class="btn sm" href="index.html">← 返回总览</a>
+        </div>
+      </div>
+
+      <div id="alert-strip"></div>
+
+      <!-- KPI：预测准确率 -->
+      <div class="grid g-3" id="kpi-row"></div>
+
+      <div class="grid g-2 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">电网负荷：预测 vs 实际</span><span class="p-extra">今日 24h · MW</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-load"></div></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">拥堵指数预测</span><span class="p-extra">今日 24h</span></div>
+          <div class="p-body"><div class="chart tall" id="ch-jam"></div></div>
+        </div>
+      </div>
+
+      <div class="grid g-21 mt">
+        <div class="panel">
+          <div class="p-head"><span class="p-title">预警规则引擎</span><span class="p-extra">拖动阈值实时判定</span></div>
+          <div class="p-body" id="rule-list"></div>
+        </div>
+        <div class="panel">
+          <div class="p-head"><span class="p-title">当前触发</span><span class="p-extra" id="fire-count">--</span></div>
+          <div class="p-body"><div class="feed" id="fire-list"></div></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/live.js"></script>
+<script>
+CityOS.mount('forecast');
+const D = CITY_DATA, H = CityOS;
+const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
+const CUR_H = new Date().getHours();
+
+/* ---------- KPI ---------- */
+{
+  const kpis = [
+    { label: '负荷预测准确率', value: D.forecast.accuracy.load, unit: '%', d: 1 },
+    { label: '拥堵预测准确率', value: D.forecast.accuracy.jam, unit: '%', d: 1 },
+    { label: 'AQI 预测准确率', value: D.forecast.accuracy.aqi, unit: '%', d: 1 },
+  ];
+  const row = H.$('#kpi-row');
+  kpis.forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'panel kpi';
+    el.innerHTML = `<div class="k-label">${k.label}</div>
+      <div class="k-value"><span class="cv">0</span><span class="unit">${k.unit}</span></div>
+      <div class="k-trend up">近 7 日滚动 MAPE</div>`;
+    row.appendChild(el);
+    H.countUp(el.querySelector('.cv'), k.value, { decimals: k.d });
+  });
+}
+
+/* ---------- 负荷：预测 vs 实际（含置信带） ---------- */
+{
+  const upper = D.forecast.loadPred.map(v => Math.round(v * 1.05));
+  const lower = D.forecast.loadPred.map(v => Math.round(v * 0.95));
+  H.makeChart(H.$('#ch-load'), {
+    xAxis: { type: 'category', data: hours, boundaryGap: false },
+    yAxis: { type: 'value', name: 'MW', scale: true },
+    series: [
+      { name: '置信下界', type: 'line', data: lower, symbol: 'none', lineStyle: { opacity: 0 }, stack: 'band', silent: true },
+      { name: '置信区间', type: 'line', data: upper.map((u, i) => u - lower[i]), symbol: 'none',
+        lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(124,92,255,0.14)' }, stack: 'band', silent: true },
+      { name: '预测值', type: 'line', data: D.forecast.loadPred, smooth: true, symbol: 'none',
+        lineStyle: { width: 2, type: 'dashed', color: '#7c5cff' }, itemStyle: { color: '#7c5cff' } },
+      { name: '实际值', type: 'line', data: D.forecast.loadActual, smooth: true, symbol: 'none',
+        lineStyle: { width: 2.5, color: '#fbbf24' }, itemStyle: { color: '#fbbf24' } },
+    ],
+    visualMap: { show: false },
+    markLine: {},
+  });
+}
+
+/* ---------- 拥堵预测 ---------- */
+H.makeChart(H.$('#ch-jam'), {
+  xAxis: { type: 'category', data: hours, boundaryGap: false },
+  yAxis: { type: 'value', min: 1, max: 3 },
+  series: [{
+    name: '预测拥堵指数', type: 'line', data: D.forecast.jamPred, smooth: true, symbol: 'none',
+    lineStyle: { width: 2.5, color: '#f87171' }, itemStyle: { color: '#f87171' },
+    areaStyle: { opacity: 0.14 },
+    markLine: {
+      silent: true, symbol: 'none',
+      lineStyle: { color: '#fbbf24', type: 'dashed' },
+      data: [{ yAxis: 2.0, label: { formatter: '拥堵预警线 2.0', color: '#fbbf24', fontSize: 10 } }],
+    },
+    markArea: {
+      silent: true, itemStyle: { color: 'rgba(248,113,113,0.07)' },
+      data: [[{ xAxis: '17:00' }, { xAxis: '20:00' }]],
+    },
+  }],
+});
+
+/* ---------- 预警规则引擎 ---------- */
+const rules = D.forecast.rules.map(r => ({ ...r }));
+const RULE_RANGE = {
+  load:    [400, 1200],
+  jam:     [1.2, 3.0],
+  aqi:     [40, 180],
+  wlevel:  [3.0, 7.0],
+  citizen: [600, 1300],
+};
+const RULE_CUR = {};   // 当前实时值（由 tick 更新）
+RULE_CUR.load = CityLive.now().load;
+RULE_CUR.jam = CityLive.now().jamIndex;
+RULE_CUR.aqi = D.environment.aqi;
+RULE_CUR.wlevel = D.water.stations[1].level;
+RULE_CUR.citizen = D.citizen.todayTotal;
+
+const ruleBox = H.$('#rule-list');
+rules.forEach(r => {
+  const [min, max] = RULE_RANGE[r.metric];
+  const step = r.metric === 'jam' || r.metric === 'wlevel' ? 0.05 : 5;
+  const card = document.createElement('div');
+  card.className = 'rule-card' + (r.enabled ? '' : ' off');
+  card.id = 'card-' + r.id;
+  card.innerHTML = `
+    <div class="head">
+      <span class="switch ${r.enabled ? 'on' : ''}" data-sw></span>
+      <span class="name">${r.name}</span>
+      <span class="state" data-state></span>
+    </div>
+    <div class="body">
+      <span class="dim" style="font-size:11px">阈值 ${r.op}</span>
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${r.threshold}" data-slider />
+      <span class="val" data-val>${r.threshold}${r.unit}</span>
+      <span class="cur" data-cur></span>
+    </div>`;
+  card.querySelector('[data-sw]').addEventListener('click', e => {
+    r.enabled = !r.enabled;
+    e.currentTarget.classList.toggle('on', r.enabled);
+    card.classList.toggle('off', !r.enabled);
+    evaluate();
+  });
+  card.querySelector('[data-slider]').addEventListener('input', e => {
+    r.threshold = parseFloat(e.target.value);
+    card.querySelector('[data-val]').textContent = r.threshold + r.unit;
+    evaluate();
+  });
+  ruleBox.appendChild(card);
+});
+
+function evaluate() {
+  const firing = rules.filter(r => r.enabled && RULE_CUR[r.metric] > r.threshold);
+  rules.forEach(r => {
+    const card = H.$('#card-' + r.id);
+    const isFire = r.enabled && RULE_CUR[r.metric] > r.threshold;
+    card.classList.toggle('firing', isFire);
+    card.querySelector('[data-state]').innerHTML = !r.enabled
+      ? H.tag('已停用', 'mute')
+      : isFire ? H.tag('🔥 触发中', 'danger') : H.tag('正常', 'ok');
+    const cur = RULE_CUR[r.metric];
+    card.querySelector('[data-cur]').textContent = '当前 ' + (typeof cur === 'number' ? +cur.toFixed(2) : cur) + (r.unit || '');
+  });
+  // 触发列表面板
+  const list = H.$('#fire-list');
+  list.innerHTML = '';
+  firing.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `<span class="t">🔥</span>
+      <div class="txt"><b>${r.name}</b>：当前值 ${(+RULE_CUR[r.metric].toFixed(2))}${r.unit} 超过阈值 ${r.op} ${r.threshold}${r.unit}</div>`;
+    list.appendChild(div);
+  });
+  if (!firing.length) list.innerHTML = '<div class="empty">当前无触发的规则，城市运行平稳</div>';
+  H.$('#fire-count').textContent = firing.length + ' 条触发';
+  H.$('#hd-alarm').textContent = firing.length ? `⚠ ${firing.length} 条规则触发中` : '✓ 全部规则正常';
+  H.$('#hd-alarm').className = 'tag ' + (firing.length ? 'danger' : 'ok');
+  const strip = H.$('#alert-strip');
+  if (firing.length) {
+    strip.style.display = 'block';
+    strip.innerHTML = `<b>🔥 预警联动</b> · ${firing.map(r => r.name).join('、')} 已触发，建议调度相关处置力量并通知值班人员。`;
+  } else {
+    strip.style.display = 'none';
+  }
+}
+evaluate();
+
+/* ---------- 实时值接入 ---------- */
+CityLive.on('tick', t => {
+  RULE_CUR.load = t.load;
+  RULE_CUR.jam = t.jamIndex;
+  RULE_CUR.aqi = t.aqi;
+  RULE_CUR.wlevel = D.water.stations[1].level + Math.sin(t.ts / 9000) * 0.03;
+  evaluate();
+});
+CityLive.start();
+</script>
+</body>
+</html>
