@@ -42,6 +42,16 @@
     { id: 'R10', name: '武汉长江大桥', level: '快速路', lanes: 6, length: 0.9 },
   ];
 
+  // 各区典型道路（事件地点 / 传感器所属道路按真实城区归属配对）
+  const DISTRICT_ROADS = {
+    '汉口滨江商务区': ['中山大道', '沿江大道', '江汉路步行街'],
+    '武昌综合区':     ['临江大道', '武珞路', '武汉长江大桥'],
+    '汉阳居住区':     ['琴台大道', '鹦鹉大道', '江城大道'],
+    '青山工业区':     ['冶金大道', '和平大道', '建设十路'],
+    '东湖生态区':     ['东湖绿道', '珞喻路', '鲁磨路'],
+    '阳逻港区':       ['阳逻快速通道', '平江大道', '汉施公路'],
+  };
+
   const BUILDINGS_TOP = [
     { name: '武汉绿地中心',   district: 'cbd',        height: 475, floors: 100, usage: '办公/酒店' },
     { name: '武汉中心大厦',   district: 'cbd',        height: 438, floors: 88, usage: '办公' },
@@ -176,7 +186,7 @@
         time: `${hh}:${mm}`,
         type: t.type,
         level: t.level,
-        place: pick(DISTRICTS).name + pick(['·', '·']) + pick(ROADS).name + pick(['交叉口', '沿线', '辅道', '商圈', '地铁站口']),
+        place: (() => { const dn = pick(DISTRICTS).name; return dn + '·' + pick(DISTRICT_ROADS[dn] || ROADS.map(r => r.name)) + pick(['交叉口', '沿线', '辅道', '商圈', '地铁站口']); })(),
         status: pick(['已处置', '已处置', '处置中', '已派单', '已处置']),
         duration: rint(6, 74) + ' 分钟',
       });
@@ -324,11 +334,12 @@
     const kinds = ['流量', '环境', '能耗', '水位', '结构'];
     for (let i = 0; i < 60; i++) {
       const kind = pick(kinds);
+      const district = pick(DISTRICTS).name;
       sensors.push({
         id: 'SN-' + String(10000 + i),
         kind,
-        district: pick(DISTRICTS).name,
-        road: pick(ROADS).name,
+        district,
+        road: pick(DISTRICT_ROADS[district] || ROADS.map(r => r.name)),
         value: kind === '流量' ? rint(200, 5200)
              : kind === '环境' ? rint(15, 90)
              : kind === '能耗' ? rfloat(2, 98, 1)
