@@ -251,10 +251,10 @@
     <div class="sec-t">视角巡航</div>
     <div class="cruise-grid">
       <button data-v="city">🌍 全城俯瞰</button>
-      <button data-v="cbd">🏙 中央商务区</button>
-      <button data-v="bridge">🌉 跨河大桥</button>
-      <button data-v="river">🏞 滨河地带</button>
-      <button data-v="hills">⛰ 山岭公园</button>
+      <button data-v="cbd">🏙 汉口滨江</button>
+      <button data-v="bridge">🌉 长江大桥</button>
+      <button data-v="tower">🏯 黄鹤楼</button>
+      <button data-v="lake">🏞 东湖</button>
       <button data-v="street">🚶 街道漫游</button>
     </div>
   </div>
@@ -277,7 +277,7 @@
     </div>
   </div>
   <div class="sec" style="font-size:11px;opacity:0.6;line-height:1.7">
-    💡 点击任意建筑可查看其数字孪生档案
+    💡 点击建筑查看孪生档案，点击黄鹤楼等地标与事件图钉有惊喜
   </div>
 </div>
 
@@ -323,6 +323,13 @@
   <div id="tp-body"></div>
 </div>
 
+<script>
+// 全局错误捕获（诊断用）
+window.__errs = [];
+window.addEventListener('error', e => {
+  window.__errs.push((e.message || '') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno);
+});
+</script>
 <script type="importmap">
 {
   "imports": {
@@ -342,7 +349,7 @@
 
 <div id="title-panel" class="hud">
   <h1>武汉 <span class="sub">WUHAN</span> · 数智一张图</h1>
-  <p>以 3D 城市地图为中心的孪生指挥视图：左侧切换专题图层（交通着色 / 能耗染色 / 事件点位 / 环境热区），点击建筑与事件图钉可查看孪生档案。拖拽旋转，滚轮缩放。</p>
+  <p>以 3D 地图为中心的江城孪生指挥视图：长江穿城、东湖点缀，黄鹤楼 / 龟山电视塔 / 江汉关 / 光谷星河等地标可点击拾取。左侧切换专题图层（交通着色 / 能耗染色 / 事件点位 / 环境热区），双击地面快速飞抵。</p>
   <p style="margin-top:10px;display:flex;gap:8px">
     <a href="index.html" style="color:#4fc3f7;border:1px solid rgba(120,180,255,0.35);border-radius:999px;padding:4px 12px;font-size:11px;text-decoration:none">← 返回态势总览</a>
     <a href="screen.html" style="color:#a9bcd8;border:1px solid rgba(120,180,255,0.25);border-radius:999px;padding:4px 12px;font-size:11px;text-decoration:none">可视化大屏 →</a>
@@ -517,12 +524,19 @@ function terrainHeight(x, z) {
   h = Math.max(0, h + 26);
   const flat = THREE.MathUtils.smoothstep(dCity, CITY_RADIUS * 0.55, CITY_RADIUS * 1.5);
   h = THREE.MathUtils.lerp(8 + fbm(x * 0.01, z * 0.01, 3) * 2.0, h, flat);
-  // 河道下切
+  // 蛇山（黄鹤楼所在，武昌江畔）与 龟山（电视塔，汉阳江畔）
+  h += Math.exp(-((x - 365) * (x - 365) + (z - 150) * (z - 150)) / (2 * 55 * 55)) * 26;
+  h += Math.exp(-((x + 320) * (x + 320) + (z + 260) * (z + 260)) / (2 * 60 * 60)) * 40;
+  // 长江河道下切（宽阔江面）
   const dRiver = Math.abs(x - riverCenterX(z));
-  const channel = Math.exp(-(dRiver * dRiver) / (2 * 46 * 46));
+  const channel = Math.exp(-(dRiver * dRiver) / (2 * 62 * 62));
   h -= channel * (h + 14);
   // 河床最低保证
-  if (dRiver < 30) h = Math.min(h, -6);
+  if (dRiver < 40) h = Math.min(h, -6);
+  // 东湖（城东南湖盆洼地，水面自动填充）
+  const dLake = Math.hypot(x - 620, z - 420);
+  h -= Math.exp(-(dLake * dLake) / (2 * 110 * 110)) * (h + 16);
+  if (dLake < 55) h = Math.min(h, -5);
   return h;
 }
 
@@ -584,8 +598,13 @@ const ROAD_W = 14;         // 道路宽
 const GRID_N = 5;          // 半径方向街区数（-5..5）
 const CITY_Y = 8.2;        // 城区基准高度
 
-function inRiver(x, z, margin = 70) {
+function inRiver(x, z, margin = 95) {
   return Math.abs(x - riverCenterX(z)) < margin;
+}
+// 地标净空区：这些范围内不生成长建筑
+const LANDMARK_CLEAR = [[365, 150, 95], [-320, -260, 80], [55, 60, 68], [390, 320, 55]];
+function nearLandmark(x, z) {
+  return LANDMARK_CLEAR.some(([lx, lz, lr]) => Math.hypot(x - lx, z - lz) < lr);
 }
 function districtOf(x, z) {
   const d = Math.hypot(x, z);
@@ -670,7 +689,8 @@ for (let bx = -GRID_N; bx < GRID_N; bx++) {
         if (rand() < 0.12) continue; // 留绿地
         const px = cx - (BLOCK - ROAD_W) / 2 + lotSize * (ix + 0.5) + (rand() - 0.5) * 4;
         const pz = cz - (BLOCK - ROAD_W) / 2 + lotSize * (iz + 0.5) + (rand() - 0.5) * 4;
-        if (inRiver(px, pz, 55)) continue;
+        if (inRiver(px, pz, 80)) continue;
+        if (nearLandmark(px, pz)) continue;
         let hgt, footprint;
         if (district === 'cbd') {
           hgt = 90 + Math.pow(rand(), 2.2) * 260;
@@ -745,12 +765,12 @@ roofMesh.castShadow = true;
 scene.add(roofMesh);
 
 /* ============================================================
- * 6. 跨河大桥
+ * 6. 武汉长江大桥（公路层 + 桁架 + 桥塔）
  * ============================================================ */
 {
-  const bridgeZ = 0; // 在 z=0 道路与河交叉处
+  const bridgeZ = 0; // 在 z=0 道路与长江交叉处
   const rx = riverCenterX(bridgeZ);
-  const deckLen = 320;
+  const deckLen = 400;
   const deck = new THREE.Mesh(
     new THREE.BoxGeometry(deckLen, 3, ROAD_W + 6),
     new THREE.MeshStandardMaterial({ color: 0x3a4048, roughness: 0.8 })
@@ -785,6 +805,122 @@ scene.add(roofMesh);
 }
 
 /* ============================================================
+ * 6.5 武汉地标群：黄鹤楼 / 龟山电视塔 / 江汉关 / 光谷星河
+ * ============================================================ */
+const landmarks = new THREE.Group();
+const landmarkHits = [];
+scene.add(landmarks);
+function regLandmark(group, info) {
+  group.traverse(o => {
+    if (o.isMesh) { o.userData.lm = info; landmarkHits.push(o); }
+  });
+}
+
+/* 黄鹤楼：五层飞檐塔楼（武昌·蛇山，金瓦丹墙） */
+{
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({
+    color: 0xd4a017, roughness: 0.45, metalness: 0.35,
+    emissive: 0x7a5200, emissiveIntensity: 0.3,
+  });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8a3226, roughness: 0.7 });
+  let w = 36, y = 0;
+  for (let tier = 0; tier < 5; tier++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, 11, w), bodyMat);
+    b.position.y = y + 5.5; b.castShadow = true;
+    g.add(b);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(w * 0.88, 10, 4), gold);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = y + 15; roof.castShadow = true;
+    g.add(roof);
+    y += 16.5; w *= 0.84;
+  }
+  const spire = new THREE.Mesh(new THREE.SphereGeometry(3.2, 8, 8), gold);
+  spire.position.y = y + 5; g.add(spire);
+  const gy = Math.max(terrainHeight(365, 150), CITY_Y);
+  g.position.set(365, gy, 150);
+  landmarks.add(g);
+  regLandmark(g, { name: '黄鹤楼', dist: '武昌区 · 蛇山', h: Math.round(gy + y + 5), floors: 5, tags: ['5A 景区', '江南三大名楼', '城市地标'] });
+}
+
+/* 龟山电视塔：塔身 + 双层球体 + 天线（汉阳·龟山） */
+{
+  const g = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc8d2dc, roughness: 0.4, metalness: 0.7 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 5.5, 105, 10), steel);
+  shaft.position.y = 52; shaft.castShadow = true; g.add(shaft);
+  const pod1 = new THREE.Mesh(new THREE.SphereGeometry(10, 14, 10), new THREE.MeshStandardMaterial({ color: 0x9fb2c0, roughness: 0.5, metalness: 0.5 }));
+  pod1.position.y = 78; pod1.scale.y = 0.62; pod1.castShadow = true; g.add(pod1);
+  const pod2 = new THREE.Mesh(new THREE.SphereGeometry(6.5, 8, 8), steel);
+  pod2.position.y = 100; pod2.scale.y = 0.7; g.add(pod2);
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.1, 42, 6), steel);
+  antenna.position.y = 126; g.add(antenna);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff4444 }));
+  beacon.position.y = 148; g.add(beacon);
+  const gy = Math.max(terrainHeight(-320, -260), CITY_Y);
+  g.position.set(-320, gy, -260);
+  landmarks.add(g);
+  regLandmark(g, { name: '龟山电视塔', dist: '汉阳区 · 龟山', h: Math.round(gy + 148), floors: 4, tags: ['广播电视发射', '城市制高点', '地标'] });
+}
+
+/* 江汉关：钟楼 + 穹顶（汉口沿江） */
+{
+  const g = new THREE.Group();
+  const stone = new THREE.MeshStandardMaterial({ color: 0xd9cfae, roughness: 0.8 });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(30, 16, 22), stone);
+  base.position.y = 8; base.castShadow = true; g.add(base);
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(10, 34, 10), stone);
+  tower.position.y = 16 + 17; tower.castShadow = true; g.add(tower);
+  const clockFace = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 1.2, 20),
+    new THREE.MeshBasicMaterial({ color: 0xf5f2e4 }));
+  clockFace.rotation.x = Math.PI / 2;
+  clockFace.position.set(0, 44, 5.4); g.add(clockFace);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(6, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x3f6b4f, roughness: 0.5 }));
+  dome.position.y = 50; g.add(dome);
+  const gy = Math.max(terrainHeight(55, 60), CITY_Y);
+  g.position.set(55, gy, 60);
+  landmarks.add(g);
+  regLandmark(g, { name: '江汉关大楼', dist: '汉口 · 沿江大道', h: Math.round(gy + 56), floors: 6, tags: ['百年海关', '全国重点文保', '地标'] });
+}
+
+/* 光谷星河：发光环雕塑（武昌·光谷广场） */
+{
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(22, 2.2, 10, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0x223a66, roughness: 0.3, metalness: 0.7,
+      emissive: 0x4fc3f7, emissiveIntensity: 0.9,
+    }));
+  ring.rotation.x = Math.PI / 12;
+  ring.position.y = 26; g.add(ring);
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 26, 8),
+    new THREE.MeshStandardMaterial({ color: 0x3a4452, roughness: 0.6 }));
+  pillar.position.y = 13; g.add(pillar);
+  const gy = Math.max(terrainHeight(390, 320), CITY_Y);
+  g.position.set(390, gy, 320);
+  landmarks.add(g);
+  regLandmark(g, { name: '光谷 · 星河', dist: '武昌 · 光谷广场', h: Math.round(gy + 50), floors: 1, tags: ['光谷标志', '夜景灯光秀', '地标'] });
+}
+
+/* 地标拾取 */
+function pickLandmark(ndc) {
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(landmarkHits, false);
+  return hits.length ? hits[0].object.userData.lm : null;
+}
+function showLandmarkCard(lm) {
+  document.getElementById('bld-name').textContent = lm.name;
+  document.getElementById('bld-dist').textContent = lm.dist;
+  document.getElementById('bld-h').textContent = lm.h + ' m';
+  document.getElementById('bld-f').textContent = lm.floors > 1 ? lm.floors + ' F' : '—';
+  document.getElementById('bld-e').textContent = '—';
+  document.getElementById('bld-o').textContent = '—';
+  document.getElementById('bld-tags').innerHTML = lm.tags.map(t => `<span class="tg">${t}</span>`).join('');
+  document.getElementById('bld-card').style.display = 'block';
+}
+
+/* ============================================================
  * 7. 树木（InstancedMesh 圆锥）与公园绿地
  * ============================================================ */
 const treeCount = 2600;
@@ -802,7 +938,7 @@ trees.castShadow = true;
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL + 2 || h > 190) continue;
     if (Math.hypot(x, z) < CITY_RADIUS * 0.92 && rand() < 0.82) continue; // 城内稀疏
-    if (inRiver(x, z, 46)) continue;
+    if (inRiver(x, z, 70)) continue;
     const th = 5 + rand() * 9;
     tmpMatrix.compose(
       new THREE.Vector3(x, h + th / 2, z),
@@ -866,7 +1002,7 @@ function updateCars(dt) {
       angle = dirSign > 0 ? Math.PI / 2 : -Math.PI / 2;
     }
     let py = CITY_Y + 1.2;
-    if (inRiver(px, pz, 160)) py = CITY_Y + 12.8; // 上桥
+    if (inRiver(px, pz, 200)) py = CITY_Y + 12.8; // 上桥
     tmpQuat.setFromAxisAngle(yAxis, angle);
     tmpMatrix.compose(
       tmpPos.set(px, py, pz),
@@ -1141,12 +1277,14 @@ function makeLabel(text) {
   return sp;
 }
 [
-  ['中央商务区', 0, 200, 0],
-  ['中城综合区', -300, 140, -220],
-  ['滨河居住区', 330, 140, 260],
-  ['南部工业区', -120, 110, 420],
-  ['山岭生态区', -550, 300, -520],
-  ['临港物流区', 560, 110, 460],
+  ['汉口滨江商务区', 0, 200, 0],
+  ['汉阳居住区', -300, 140, -220],
+  ['武昌综合区', 330, 140, 260],
+  ['青山工业区', -120, 110, 420],
+  ['东湖生态区', 620, 130, 420],
+  ['阳逻港区', 300, 110, -520],
+  ['黄鹤楼', 365, 120, 210],
+  ['龟山电视塔', -320, 210, -330],
 ].forEach(([name, x, y, z]) => {
   const sp = makeLabel(name);
   sp.position.set(x, y, z);
@@ -1186,9 +1324,9 @@ function flyTo(p1, t1, dur = 1800) {
 const VIEWS = {
   city:   { p: [560, 420, 560],   t: [0, 20, 0] },
   cbd:    { p: [170, 130, 170],   t: [0, 80, 0] },
-  bridge: { p: [290, 95, 140],    t: [119, 16, 0] },
-  river:  { p: [-120, 130, 420],  t: [230, 12, 280] },
-  hills:  { p: [-780, 420, -620], t: [-350, 160, -350] },
+  bridge: { p: [330, 110, 170],   t: [119, 16, 0] },
+  tower:  { p: [240, 130, 330],   t: [365, 60, 150] },
+  lake:   { p: [380, 240, 620],   t: [620, 10, 420] },
   street: { p: [60, 16, 60],      t: [-80, 22, -40] },
 };
 document.querySelectorAll('.cruise-grid button').forEach(b => {
@@ -1229,7 +1367,7 @@ const pointerNDC = new THREE.Vector2();
 let downPos = null;
 const BLD_NAMES = ['云璟', '汇峰', '天誉', '澜庭', '星澜', '锦宸', '朗润', '嘉禾', '璞悦', '晟世'];
 const BLD_SUFFIX = ['中心', '大厦', '广场', '国际', '公馆', '塔', '天地', '汇'];
-const DIST_NAME = { cbd: '中央商务区', midtown: '中城综合区', industrial: '南部工业区', residential: '滨河居住区' };
+const DIST_NAME = { cbd: '汉口滨江商务区', midtown: '武昌综合区', industrial: '青山工业区', residential: '汉阳居住区' };
 
 const hlBox = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.06, 1.02, 1.06)),
@@ -1254,7 +1392,7 @@ function showBldCard(id, m) {
   const h = Math.round(s.y);
   const name = bldNameOf(id);
   document.getElementById('bld-name').textContent = name;
-  document.getElementById('bld-dist').textContent = DIST_NAME[dist] || '滨河居住区';
+  document.getElementById('bld-dist').textContent = DIST_NAME[dist] || '汉阳居住区';
   document.getElementById('bld-h').textContent = h + ' m';
   document.getElementById('bld-f').textContent = Math.max(2, Math.round(h / 4.2)) + ' F';
   document.getElementById('bld-e').textContent = Math.round(800 + bldRand(id, 4) * 9200) + ' kWh';
@@ -1288,6 +1426,8 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (window.__analysisClick && window.__analysisClick(pointerNDC)) return;
   const pinHit = pickEventPin(pointerNDC);
   if (pinHit) { showEvtCard(pinHit.object.userData.ev); return; }
+  const lmHit = pickLandmark(pointerNDC);
+  if (lmHit) { showLandmarkCard(lmHit); return; }
   const hit = pickBuilding(pointerNDC);
   if (hit) {
     const m = new THREE.Matrix4();
@@ -1639,8 +1779,8 @@ envLayer.visible = false;
 if (D) {
   const discGeo = new THREE.CircleGeometry(120, 40);
   discGeo.rotateX(-Math.PI / 2);
-  const spots = [[0, 0], [-300, -220], [330, 260], [-120, 420], [-550, -520], [560, 460]];
-  const dNames = ['中央商务区', '中城综合区', '滨河居住区', '南部工业区', '山岭生态区', '临港物流区'];
+  const dNames = ['汉口滨江商务区', '汉阳居住区', '武昌综合区', '青山工业区', '东湖生态区', '阳逻港区'];
+  const spots = [[0, 0], [-300, -220], [330, 260], [-120, 420], [620, 420], [300, -520]];
   spots.forEach(([x, z], i) => {
     const aqi = Math.round(D.environment.aqi * (0.8 + bldRand(i, 31) * 0.5));
     const col = aqi <= 50 ? 0x34d399 : aqi <= 100 ? 0xfbbf24 : 0xf87171;
@@ -1815,11 +1955,20 @@ renderer.domElement.addEventListener('pointermove', e => {
     ((e.clientX - r.left) / r.width) * 2 - 1,
     -((e.clientY - r.top) / r.height) * 2 + 1
   );
-  // 图钉优先，其次建筑
+  // 图钉优先，其次地标，再次建筑
   const pin = pickEventPin(ndc);
   if (pin) {
     const ev = pin.object.userData.ev;
     hoverTip.innerHTML = `<span class="lv" style="background:#${new THREE.Color(LEVEL_COLOR[ev.level] || 0x94a3b8).getHexString()}"></span>[${ev.type}] ${ev.place}`;
+    hoverTip.style.display = 'block';
+    hoverTip.style.left = e.clientX + 'px';
+    hoverTip.style.top = e.clientY + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+    return;
+  }
+  const lm = pickLandmark(ndc);
+  if (lm) {
+    hoverTip.textContent = '📍 ' + lm.name + '（点击查看地标档案）';
     hoverTip.style.display = 'block';
     hoverTip.style.left = e.clientX + 'px';
     hoverTip.style.top = e.clientY + 'px';
