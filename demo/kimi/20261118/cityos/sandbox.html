@@ -138,18 +138,36 @@
   /* ---------- 数智一张图：专题图层 dock ---------- */
   #theme-dock {
     top: 50%; left: 20px; transform: translateY(-50%);
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column; gap: 10px;
   }
   .th-tab {
-    width: 58px; padding: 9px 0 7px; position: relative;
+    width: 60px; padding: 10px 0 8px; position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 3px;
-    font-size: 18px; background: var(--panel-bg);
-    border: 1px solid var(--panel-border); border-radius: 10px;
-    cursor: pointer; backdrop-filter: blur(10px); transition: all .15s ease;
+    font-size: 19px; background: var(--panel-bg);
+    border: 1px solid var(--panel-border); border-radius: 12px;
+    cursor: pointer; backdrop-filter: blur(10px);
+    transition: all .22s cubic-bezier(.34, 1.4, .5, 1);
+    animation: dockIn .5s cubic-bezier(.22, 1, .36, 1) both;
   }
-  .th-tab span { font-size: 10px; letter-spacing: 1px; opacity: 0.8; }
-  .th-tab:hover { border-color: var(--accent); }
-  .th-tab.active { background: rgba(79, 195, 247, 0.25); border-color: var(--accent); box-shadow: 0 0 14px rgba(79, 195, 247, 0.3); }
+  .th-tab:nth-child(1) { animation-delay: .30s; }
+  .th-tab:nth-child(2) { animation-delay: .38s; }
+  .th-tab:nth-child(3) { animation-delay: .46s; }
+  .th-tab:nth-child(4) { animation-delay: .54s; }
+  .th-tab:nth-child(5) { animation-delay: .62s; }
+  @keyframes dockIn { from { opacity: 0; transform: translateX(-18px) scale(0.9); } }
+  .th-tab span { font-size: 10px; letter-spacing: 1px; opacity: 0.8; transition: opacity .2s; }
+  .th-tab:hover { border-color: var(--tc, var(--accent)); transform: translateX(4px); }
+  .th-tab.active {
+    background: rgba(79, 195, 247, 0.14);
+    border-color: var(--tc, var(--accent));
+    box-shadow: 0 0 16px var(--tc, var(--accent)), inset 0 0 12px rgba(255,255,255,0.04);
+    transform: translateX(6px) scale(1.06);
+  }
+  .th-tab.active::before {
+    content: ""; position: absolute; left: -1px; top: 20%; bottom: 20%; width: 3px;
+    border-radius: 2px; background: var(--tc, var(--accent));
+    box-shadow: 0 0 8px var(--tc, var(--accent));
+  }
   .th-tab .dot-alert {
     position: absolute; top: -3px; right: -3px; width: 9px; height: 9px;
     border-radius: 50%; background: #f87171; box-shadow: 0 0 6px #f87171; display: none;
@@ -163,14 +181,39 @@
     background: var(--panel-bg); border: 1px solid var(--panel-border);
     border-radius: 12px; backdrop-filter: blur(10px); font-size: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.45); line-height: 1.5;
+    transition: border-color 0.4s ease;
   }
-  #theme-panel .tp-t { font-size: 11px; letter-spacing: 2px; font-weight: 600; margin-bottom: 8px; }
+  #theme-panel .tp-t { font-size: 11px; letter-spacing: 2px; font-weight: 600; margin-bottom: 8px; transition: color .3s; }
   #theme-panel .tp-t::before { content: ""; display: inline-block; width: 3px; height: 10px; background: var(--accent); border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  #theme-panel #tp-body { transition: opacity 0.16s ease, transform 0.16s ease; }
+  #theme-panel #tp-body.swap { opacity: 0; transform: translateY(5px); }
   #theme-panel .row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
   #theme-panel .k { opacity: 0.65; }
   #theme-panel .v { color: var(--accent); font-family: "SF Mono", "Consolas", monospace; font-variant-numeric: tabular-nums; }
   #theme-panel .v.warn { color: #fbbf24; }
   #theme-panel .v.danger { color: #f87171; }
+
+  /* 悬停提示（建筑/图钉） */
+  #hover-tip {
+    position: fixed; z-index: 30; pointer-events: none; display: none;
+    padding: 5px 12px; border-radius: 8px; font-size: 11.5px; letter-spacing: 0.5px;
+    background: rgba(10, 17, 32, 0.9); border: 1px solid var(--panel-border);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    transform: translate(14px, -30px); white-space: nowrap;
+  }
+  #hover-tip .lv { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+  /* 进场交互引导 */
+  #enter-tip {
+    position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 20;
+    padding: 9px 22px; border-radius: 999px; font-size: 12px; letter-spacing: 1px;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    backdrop-filter: blur(10px); box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    animation: tipFloat 2.6s ease-in-out infinite; transition: opacity .6s ease;
+  }
+  @keyframes tipFloat { 50% { transform: translateX(-50%) translateY(-5px); } }
 
   /* 事件详情卡 */
   #evt-card {
@@ -261,14 +304,18 @@
   <a class="go" href="emergency.html">前往应急指挥 →</a>
 </div>
 
-<!-- 专题图层 dock（数智一张图核心入口） -->
+<!-- 专题图层 dock（数智一张图核心入口，各主题独立色） -->
 <div id="theme-dock" class="hud">
-  <div class="th-tab active" data-th="overview">🏙<span>综合</span></div>
-  <div class="th-tab" data-th="traffic">🚦<span>交通</span></div>
-  <div class="th-tab" data-th="energy">⚡<span>能源</span></div>
-  <div class="th-tab" data-th="emergency">🚨<span>应急</span><i class="dot-alert" id="th-dot-emergency"></i></div>
-  <div class="th-tab" data-th="env">🌿<span>环境</span></div>
+  <div class="th-tab active" data-th="overview" style="--tc:#4fc3f7">🏙<span>综合</span></div>
+  <div class="th-tab" data-th="traffic" style="--tc:#fbbf24">🚦<span>交通</span></div>
+  <div class="th-tab" data-th="energy" style="--tc:#a3e635">⚡<span>能源</span></div>
+  <div class="th-tab" data-th="emergency" style="--tc:#f87171">🚨<span>应急</span><i class="dot-alert" id="th-dot-emergency"></i></div>
+  <div class="th-tab" data-th="env" style="--tc:#34d399">🌿<span>环境</span></div>
 </div>
+
+<!-- 悬停提示 + 进场引导 -->
+<div id="hover-tip"></div>
+<div id="enter-tip">💡 单击建筑 / 图钉查看孪生详情 · 双击地面快速飞抵 · 左侧切换专题图层</div>
 
 <!-- 主题指标面板 -->
 <div id="theme-panel" class="hud">
@@ -1195,14 +1242,17 @@ function bldRand(id, salt) {
   const x = Math.sin(id * 127.1 + salt * 311.7) * 43758.5453;
   return x - Math.floor(x);
 }
+function bldNameOf(id) {
+  return BLD_NAMES[Math.floor(bldRand(id, 1) * BLD_NAMES.length)] +
+         BLD_SUFFIX[Math.floor(bldRand(id, 2) * BLD_SUFFIX.length)] +
+         ' · T' + (1 + Math.floor(bldRand(id, 3) * 5));
+}
 function showBldCard(id, m) {
   const pos = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
   m.decompose(pos, q, s);
   const dist = districtOf(pos.x, pos.z);
   const h = Math.round(s.y);
-  const name = BLD_NAMES[Math.floor(bldRand(id, 1) * BLD_NAMES.length)] +
-               BLD_SUFFIX[Math.floor(bldRand(id, 2) * BLD_SUFFIX.length)] +
-               ' · T' + (1 + Math.floor(bldRand(id, 3) * 5));
+  const name = bldNameOf(id);
   document.getElementById('bld-name').textContent = name;
   document.getElementById('bld-dist').textContent = DIST_NAME[dist] || '滨河居住区';
   document.getElementById('bld-h').textContent = h + ' m';
@@ -1427,6 +1477,7 @@ if (D) {
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
       color, transparent: true, opacity: 0.5, depthWrite: false,
     }));
+    m.userData.baseOp = 0.5;
     if (line.axis === 'x') m.position.set((line.from + line.to) / 2, CITY_Y + 0.6, line.coord);
     else m.position.set(line.coord, CITY_Y + 0.6, (line.from + line.to) / 2);
     trafficLayer.add(m);
@@ -1434,22 +1485,66 @@ if (D) {
 }
 scene.add(trafficLayer);
 
-/* ---- 专题层 2：能源能耗建筑染色 ---- */
+/* ---- 专题层 2：能源能耗建筑染色（渐变过渡） ---- */
 const origBldColors = buildingColors.map(c => c.clone());
 const heatA = new THREE.Color(0x34d399), heatB = new THREE.Color(0xfbbf24), heatC = new THREE.Color(0xf87171);
-function tintBuildingsByEnergy(on) {
+function energyColorOf(i, out) {
+  const e = (800 + bldRand(i, 4) * 9200) / 10000;   // 0.08 ~ 1.0
+  if (e < 0.5) out.copy(heatA).lerp(heatB, e * 2);
+  else out.copy(heatB).lerp(heatC, (e - 0.5) * 2);
+  return out;
+}
+let tintAnim = null;
+function animateTint(toEnergy) {
+  const from = [], to = [];
   const c = new THREE.Color();
   for (let i = 0; i < buildings.count; i++) {
-    if (!on) c.copy(origBldColors[i]);
-    else {
-      const e = (800 + bldRand(i, 4) * 9200) / 10000;   // 0.08 ~ 1.0
-      if (e < 0.5) c.copy(heatA).lerp(heatB, e * 2);
-      else c.copy(heatB).lerp(heatC, (e - 0.5) * 2);
-    }
+    buildings.getColorAt(i, c);
+    from.push(c.clone());
+    to.push(toEnergy ? energyColorOf(i, new THREE.Color()) : origBldColors[i].clone());
+  }
+  tintAnim = { from, to, t0: performance.now(), dur: 650 };
+}
+(function tintLoop() {
+  requestAnimationFrame(tintLoop);
+  if (!tintAnim) return;
+  const k = Math.min(1, (performance.now() - tintAnim.t0) / tintAnim.dur);
+  const e = k * k * (3 - 2 * k);
+  const c = new THREE.Color();
+  for (let i = 0; i < buildings.count; i++) {
+    c.copy(tintAnim.from[i]).lerp(tintAnim.to[i], e);
     buildings.setColorAt(i, c);
   }
   buildings.instanceColor.needsUpdate = true;
+  if (k >= 1) tintAnim = null;
+})();
+
+/* ---- 图层淡入淡出 ---- */
+const fadingLayers = new Set();
+function fadeLayer(group, show, dur = 550) {
+  if (show) group.visible = true;
+  group.userData.fade = { t0: performance.now(), dur, dir: show ? 1 : -1 };
+  fadingLayers.add(group);
 }
+(function fadeLoop() {
+  requestAnimationFrame(fadeLoop);
+  if (!fadingLayers.size) return;
+  const now = performance.now();
+  fadingLayers.forEach(group => {
+    const f = group.userData.fade;
+    const k = Math.min(1, (now - f.t0) / f.dur);
+    const e = k * k * (3 - 2 * k);
+    const factor = f.dir > 0 ? e : 1 - e;
+    group.children.forEach(ch => {
+      if (ch.material) ch.material.opacity = (ch.userData.baseOp != null ? ch.userData.baseOp : 1) * factor;
+    });
+    if (k >= 1) {
+      if (f.dir < 0) group.visible = false;
+      delete group.userData.fade;
+      fadingLayers.delete(group);
+    }
+  });
+})();
 
 /* ---- 专题层 3：应急事件点位（图钉 + 脉冲圈，常显） ---- */
 const eventLayer = new THREE.Group();
@@ -1552,12 +1647,14 @@ if (D) {
     const disc = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({
       color: col, transparent: true, opacity: 0.22, depthWrite: false,
     }));
+    disc.userData.baseOp = 0.22;
     const gy = Math.max(terrainHeight(x, z), CITY_Y);
     disc.position.set(x, gy + 3, z);
     envLayer.add(disc);
     const sp = makeLabel(`${dNames[i]} AQI ${aqi}`);
     sp.scale.set(110, 27.5, 1);
     sp.position.set(x, gy + 55, z);
+    sp.userData.baseOp = 1;
     envLayer.add(sp);
   });
 }
@@ -1630,14 +1727,37 @@ function renderThemePanel() {
   }
 }
 
-/* ---- 专题切换 ---- */
+/* ---- 专题切换（图层淡入淡出 + 相机主题巡航 + 面板交叉淡化） ---- */
+const THEME_COLOR = { overview: '#4fc3f7', traffic: '#fbbf24', energy: '#a3e635', emergency: '#f87171', env: '#34d399' };
+const THEME_VIEWS = {
+  overview:  { p: [560, 420, 560], t: [0, 20, 0] },
+  traffic:   { p: [430, 300, 470], t: [0, 10, 40] },
+  energy:    { p: [190, 240, 330], t: [0, 60, 0] },
+  emergency: { p: [640, 470, 640], t: [0, 20, 0] },
+  env:       { p: [220, 760, 330], t: [0, 0, 60] },
+};
+let panelSwapTimer = null;
 function applyTheme(th) {
+  if (th === curTheme) return;
   curTheme = th;
   themeTabs.forEach(b => b.classList.toggle('active', b.dataset.th === th));
-  trafficLayer.visible = th === 'traffic';
-  envLayer.visible = th === 'env';
-  tintBuildingsByEnergy(th === 'energy');
-  renderThemePanel();
+  fadeLayer(trafficLayer, th === 'traffic');
+  fadeLayer(envLayer, th === 'env');
+  animateTint(th === 'energy');
+  // 相机巡航到主题视角
+  const v = THEME_VIEWS[th];
+  if (v) flyTo(v.p, v.t, 1900);
+  // 面板主题色 + 内容交叉淡化
+  const tc = THEME_COLOR[th];
+  document.getElementById('theme-panel').style.borderColor = tc + '66';
+  document.getElementById('tp-title').style.color = tc;
+  const body = document.getElementById('tp-body');
+  body.classList.add('swap');
+  clearTimeout(panelSwapTimer);
+  panelSwapTimer = setTimeout(() => {
+    renderThemePanel();
+    body.classList.remove('swap');
+  }, 170);
 }
 themeTabs.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.th)));
 renderThemePanel();
@@ -1670,7 +1790,7 @@ window.__pickPin = (nx, ny) => {
 // 测试钩子：图钉层诊断
 window.__pinDebug = () => {
   const v = new THREE.Vector3();
-  const out = {
+  return {
     meshes: pinHitMeshes.length,
     pins: eventPins.map(p => {
       p.cone.getWorldPosition(v);
@@ -1678,25 +1798,83 @@ window.__pinDebug = () => {
       return { sx: +s.x.toFixed(2), sy: +s.y.toFixed(2), behind: s.z > 1 };
     }),
   };
-  if (eventPins.length) {
-    const p = out.pins[0];
-    const rc = new THREE.Raycaster();
-    rc.setFromCamera(new THREE.Vector2(p.sx, p.sy), camera);
-    out.directHits = rc.intersectObjects(pinHitMeshes, false).length;
-    out.anyHits = rc.intersectObjects(eventLayer.children, true).length;
-    const cone = eventPins[0].cone;
-    out.singleCone = rc.intersectObject(cone, false).length;
-    const bs = cone.geometry.boundingSphere;
-    out.bs = bs ? [bs.center.toArray().map(v => +v.toFixed(1)), +bs.radius.toFixed(1)] : null;
-    out.ray = { o: rc.ray.origin.toArray().map(v => Math.round(v)), d: rc.ray.direction.toArray().map(v => +v.toFixed(3)) };
-    const wp = new THREE.Vector3();
-    cone.getWorldPosition(wp);
-    out.coneWorld = wp.toArray().map(v => Math.round(v));
-    // 射线与锥心距
-    out.distRayToCone = +rc.ray.distanceToPoint(wp).toFixed(2);
-  }
-  return out;
 };
+
+/* ============================================================
+ * 17. 交互增强：悬停提示 / 双击飞抵 / 进场自动环绕
+ * ============================================================ */
+const hoverTip = document.getElementById('hover-tip');
+let hoverThrottle = 0;
+renderer.domElement.addEventListener('pointermove', e => {
+  const now = performance.now();
+  if (now - hoverThrottle < 70) return;
+  hoverThrottle = now;
+  const r = renderer.domElement.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return;
+  const ndc = new THREE.Vector2(
+    ((e.clientX - r.left) / r.width) * 2 - 1,
+    -((e.clientY - r.top) / r.height) * 2 + 1
+  );
+  // 图钉优先，其次建筑
+  const pin = pickEventPin(ndc);
+  if (pin) {
+    const ev = pin.object.userData.ev;
+    hoverTip.innerHTML = `<span class="lv" style="background:#${new THREE.Color(LEVEL_COLOR[ev.level] || 0x94a3b8).getHexString()}"></span>[${ev.type}] ${ev.place}`;
+    hoverTip.style.display = 'block';
+    hoverTip.style.left = e.clientX + 'px';
+    hoverTip.style.top = e.clientY + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+    return;
+  }
+  const hit = pickBuilding(ndc);
+  if (hit) {
+    hoverTip.textContent = '🏢 ' + bldNameOf(hit.instanceId) + '（点击查看孪生档案）';
+    hoverTip.style.display = 'block';
+    hoverTip.style.left = e.clientX + 'px';
+    hoverTip.style.top = e.clientY + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+  } else {
+    hoverTip.style.display = 'none';
+    renderer.domElement.style.cursor = anaMode ? 'crosshair' : '';
+  }
+});
+
+/* 双击地面 → 快速飞抵 */
+renderer.domElement.addEventListener('dblclick', e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return;
+  const ndc = new THREE.Vector2(
+    ((e.clientX - r.left) / r.width) * 2 - 1,
+    -((e.clientY - r.top) / r.height) * 2 + 1
+  );
+  const p = groundPoint(ndc);
+  if (!p) return;
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  flyTo(
+    [p.x + dir.x * 240, Math.max(p.y + 170, dir.y * 240 + 60), p.z + dir.z * 240],
+    [p.x, p.y, p.z],
+    1500
+  );
+});
+
+/* 进场：自动环绕展示，用户首次拖拽即停 */
+setTimeout(() => {
+  controls.autoRotate = true;
+  document.getElementById('btn-rotate').classList.add('active');
+  const stop = () => {
+    controls.autoRotate = false;
+    document.getElementById('btn-rotate').classList.remove('active');
+    renderer.domElement.removeEventListener('pointerdown', stop);
+  };
+  renderer.domElement.addEventListener('pointerdown', stop);
+}, 2800);
+
+/* 进场引导 toast：8 秒后淡出 */
+setTimeout(() => {
+  const tip = document.getElementById('enter-tip');
+  tip.style.opacity = '0';
+  setTimeout(() => tip.remove(), 700);
+}, 8000);
 </script>
 </body>
 </html>
