@@ -135,6 +135,32 @@
   #bld-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.6; font-size: 14px; }
   #bld-close:hover { opacity: 1; }
 
+  /* 地标讲解卡 */
+  #lm-card {
+    position: fixed; bottom: 24px; right: 100px; width: 302px; z-index: 13;
+    background: var(--panel-bg); border: 1px solid #d4a017;
+    border-radius: 12px; backdrop-filter: blur(10px);
+    box-shadow: 0 0 28px rgba(212,160,23,0.28);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: none; font-size: 12px; overflow: hidden;
+  }
+  #lm-card.pop { animation: lmIn .32s cubic-bezier(.22,1,.36,1); }
+  @keyframes lmIn { from { opacity: 0; transform: translateY(14px) scale(0.96); } }
+  #lm-card .banner { width: 100%; height: 136px; object-fit: cover; display: block; background: linear-gradient(135deg, #1a2f4a, #0b1626); }
+  #lm-card .body { padding: 12px 16px 14px; }
+  #lm-card h4 { font-size: 15px; letter-spacing: 1px; margin-bottom: 2px; }
+  #lm-card .sub { font-size: 11px; opacity: 0.65; margin-bottom: 8px; }
+  #lm-card .desc { font-size: 11.5px; line-height: 1.75; opacity: 0.92; text-align: justify; }
+  #lm-card .light-row { display: flex; align-items: center; gap: 6px; margin-top: 9px; font-size: 11px; opacity: 0.95; }
+  #lm-card .lamp-dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; flex-shrink: 0; }
+  #lm-card .lamp-dot.on { background: #ffd98a; box-shadow: 0 0 8px #ffd98a; animation: tabPulse 1.4s ease infinite; }
+  #lm-card .tags { margin-top: 9px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #lm-card .tg { font-size: 10px; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(212,160,23,0.45); color: #e8d9ae; }
+  #lm-card .fly { display: block; margin-top: 10px; text-align: center; font-size: 11px; padding: 6px 0; border-radius: 7px; border: 1px solid rgba(212,160,23,0.5); color: #ffd98a; cursor: pointer; background: none; font-family: inherit; width: 100%; letter-spacing: 1px; }
+  #lm-card .fly:hover { background: rgba(212,160,23,0.15); }
+  #lm-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.8; font-size: 14px; z-index: 2; text-shadow: 0 1px 4px rgba(0,0,0,0.85); }
+  #lm-close:hover { opacity: 1; }
+
   /* ---------- 数智一张图：专题图层 dock ---------- */
   #theme-dock {
     top: 50%; left: 20px; transform: translateY(-50%);
@@ -277,7 +303,7 @@
     </div>
   </div>
   <div class="sec" style="font-size:11px;opacity:0.6;line-height:1.7">
-    💡 点击建筑查看孪生档案，点击黄鹤楼等地标与事件图钉有惊喜
+    💡 点击地标看讲解卡 · 夜晚长江上演灯光秀 · 图钉为实时事件
   </div>
 </div>
 
@@ -291,6 +317,20 @@
   <div class="row"><span class="k">今日能耗</span><span class="v" id="bld-e">--</span></div>
   <div class="row"><span class="k">入驻率</span><span class="v" id="bld-o">--</span></div>
   <div class="tags" id="bld-tags"></div>
+</div>
+
+<!-- 地标讲解卡 -->
+<div id="lm-card">
+  <span id="lm-close">✕</span>
+  <img class="banner" id="lm-img" alt="地标插画" />
+  <div class="body">
+    <h4 id="lm-name">--</h4>
+    <div class="sub" id="lm-dist">--</div>
+    <div class="desc" id="lm-desc">--</div>
+    <div class="light-row"><span class="lamp-dot" id="lm-lamp"></span><span id="lm-light">--</span></div>
+    <div class="tags" id="lm-tags"></div>
+    <button class="fly" id="lm-fly">🎥 飞抵观赏</button>
+  </div>
 </div>
 
 <!-- 事件详情卡 -->
@@ -805,16 +845,122 @@ scene.add(roofMesh);
 }
 
 /* ============================================================
+ * 6.6 长江夜景灯光秀：桥面灯带 + 江面灯光倒影 + 游船光点
+ * ============================================================ */
+const riverLightGroup = new THREE.Group();
+riverLightGroup.userData.level = 0;   // 0=白天熄灭 1=全亮（applyTimeOfDay 驱动）
+riverLightGroup.visible = false;
+scene.add(riverLightGroup);
+const riverStreaks = [];   // { mat, base, speed, phase }
+const riverBoats = [];
+{
+  // ① 大桥桥面双侧灯带（暖金）
+  const brx = riverCenterX(0);
+  const stripMat = new THREE.MeshBasicMaterial({
+    color: 0xffca6a, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  [-1, 1].forEach(side => {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(400, 0.7, 0.9), stripMat);
+    strip.position.set(brx, CITY_Y + 12.4, side * (ROAD_W / 2 + 3.4));
+    riverLightGroup.add(strip);
+  });
+  riverStreaks.push({ mat: stripMat, base: 0.95, speed: 0.8, phase: 0 });
+  // 桥塔轮廓点光（冰蓝）
+  const towerDotMat = new THREE.MeshBasicMaterial({
+    color: 0x9fd8ff, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  [-70, 70].forEach(off => {
+    for (let i = 0; i < 7; i++) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.9, 6, 6), towerDotMat);
+      dot.position.set(brx + off, CITY_Y + 16 + i * 9.4, 0);
+      riverLightGroup.add(dot);
+    }
+  });
+  riverStreaks.push({ mat: towerDotMat, base: 0.85, speed: 1.6, phase: 2.1 });
+  // ② 江面灯光倒影：两岸楼宇灯火的细长拖影（呼吸闪烁）
+  const streakPalette = [0xffc46a, 0xffc46a, 0x7ec8ff, 0xff9fd0, 0xfff2c8];
+  for (let i = 0; i < 96; i++) {
+    const z = -950 + rand() * 1900;
+    const side = rand() < 0.5 ? -1 : 1;
+    const off = side * (30 + rand() * 58);           // 两岸水域
+    const len = 10 + rand() * 34;                    // 倒影拉长
+    const wid = 1.2 + rand() * 2.6;
+    const geo = new THREE.PlaneGeometry(wid, len);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({
+      color: streakPalette[Math.floor(rand() * streakPalette.length)],
+      transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(riverCenterX(z) + off, WATER_LEVEL + 0.35 + rand() * 0.2, z);
+    riverLightGroup.add(m);
+    riverStreaks.push({ mat, base: 0.35 + rand() * 0.5, speed: 0.6 + rand() * 1.6, phase: rand() * Math.PI * 2 });
+  }
+  // ③ 江面游船光点（沿江缓行，拖出光尾）
+  const boatMat = new THREE.MeshBasicMaterial({
+    color: 0xffe9b0, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  for (let i = 0; i < 5; i++) {
+    const boat = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(1.7, 8, 8), boatMat);
+    const wakeGeo = new THREE.PlaneGeometry(1.3, 18);
+    wakeGeo.rotateX(-Math.PI / 2);
+    const wake = new THREE.Mesh(wakeGeo, new THREE.MeshBasicMaterial({
+      color: 0xffca6a, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    wake.position.set(0, -0.6, 9);
+    boat.add(hull); boat.add(wake);
+    boat.userData = { t: rand(), speed: (0.010 + rand() * 0.012) * (rand() < 0.5 ? 1 : -1), off: (rand() - 0.5) * 36 };
+    riverLightGroup.add(boat);
+    riverBoats.push(boat);
+    riverStreaks.push({ mat: wake.material, base: 0.42, speed: 1.1, phase: i });
+  }
+  riverStreaks.push({ mat: boatMat, base: 0.92, speed: 1.1, phase: 0.7 });
+}
+/* 灯光秀动画：倒影呼吸闪烁 + 游船游弋 */
+(function riverLightLoop() {
+  requestAnimationFrame(riverLightLoop);
+  const lv = riverLightGroup.userData.level || 0;
+  if (lv <= 0.02 || !riverLightGroup.visible) return;
+  const t = performance.now() / 1000;
+  for (const s of riverStreaks) {
+    s.mat.opacity = lv * s.base * (0.6 + 0.4 * Math.sin(t * s.speed + s.phase));
+  }
+  for (const b of riverBoats) {
+    b.userData.t = (b.userData.t + b.userData.speed * 0.016 + 1) % 1;
+    const z = -950 + b.userData.t * 1900;
+    b.position.set(riverCenterX(z) + b.userData.off, WATER_LEVEL + 1.2, z);
+    b.rotation.y = b.userData.speed > 0 ? 0 : Math.PI;
+  }
+})();
+
+/* ============================================================
  * 6.5 武汉地标群：黄鹤楼 / 龟山电视塔 / 江汉关 / 光谷星河
  * ============================================================ */
 const landmarks = new THREE.Group();
 const landmarkHits = [];
 scene.add(landmarks);
+const lmEmissives = [];   // 参与夜景亮灯联动的地标材质 { mat, base, night }
+let currentLm = null;     // 当前打开讲解卡的地标
+const LM_INFOS = [];
 function regLandmark(group, info) {
+  LM_INFOS.push(info);
   group.traverse(o => {
     if (o.isMesh) { o.userData.lm = info; landmarkHits.push(o); }
   });
 }
+// 测试钩子：按序号打开地标讲解卡（供自动化验证）
+window.__showLm = i => {
+  const info = LM_INFOS[i];
+  if (!info) return null;
+  showLandmarkCard(info);
+  return info.name;
+};
 
 /* 黄鹤楼：五层飞檐塔楼（武昌·蛇山，金瓦丹墙） */
 {
@@ -840,13 +986,21 @@ function regLandmark(group, info) {
   const gy = Math.max(terrainHeight(365, 150), CITY_Y);
   g.position.set(365, gy, 150);
   landmarks.add(g);
-  regLandmark(g, { name: '黄鹤楼', dist: '武昌区 · 蛇山', h: Math.round(gy + y + 5), floors: 5, tags: ['5A 景区', '江南三大名楼', '城市地标'] });
+  regLandmark(g, {
+    name: '黄鹤楼', dist: '武昌区 · 蛇山', h: Math.round(gy + y + 5), floors: 5,
+    tags: ['5A 景区', '江南三大名楼', '城市地标'],
+    img: 'assets/img/lm-huanghelou.jpg',
+    desc: '始建于三国吴黄武二年（223 年），历代屡毁屡建，今楼于 1985 年重建、高 51.4 米，为“江南三大名楼”之首。崔颢一首《黄鹤楼》使其名扬千古，登楼可俯瞰武汉长江大桥与两江四岸。',
+    light: '夜景泛光 19:00–22:30 开启，金色飞檐逐层点亮',
+    view: { p: [240, 130, 330], t: [365, 60, 150] },
+  });
+  lmEmissives.push({ mat: gold, base: 0.3, night: 1.9 });
 }
 
 /* 龟山电视塔：塔身 + 双层球体 + 天线（汉阳·龟山） */
 {
   const g = new THREE.Group();
-  const steel = new THREE.MeshStandardMaterial({ color: 0xc8d2dc, roughness: 0.4, metalness: 0.7 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc8d2dc, roughness: 0.4, metalness: 0.7, emissive: 0x3a6bd8, emissiveIntensity: 0.04 });
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 5.5, 105, 10), steel);
   shaft.position.y = 52; shaft.castShadow = true; g.add(shaft);
   const pod1 = new THREE.Mesh(new THREE.SphereGeometry(10, 14, 10), new THREE.MeshStandardMaterial({ color: 0x9fb2c0, roughness: 0.5, metalness: 0.5 }));
@@ -860,13 +1014,21 @@ function regLandmark(group, info) {
   const gy = Math.max(terrainHeight(-320, -260), CITY_Y);
   g.position.set(-320, gy, -260);
   landmarks.add(g);
-  regLandmark(g, { name: '龟山电视塔', dist: '汉阳区 · 龟山', h: Math.round(gy + 148), floors: 4, tags: ['广播电视发射', '城市制高点', '地标'] });
+  regLandmark(g, {
+    name: '龟山电视塔', dist: '汉阳区 · 龟山', h: Math.round(gy + 148), floors: 4,
+    tags: ['广播电视发射', '城市制高点', '地标'],
+    img: 'assets/img/lm-guishan.jpg',
+    desc: '1986 年建成，塔高 221.2 米，曾是“亚洲第一高塔”。屹立龟山之巅，与武昌黄鹤楼隔江相望，构成“龟蛇锁大江”的武汉经典意象，夜间塔身蓝紫色轮廓灯常亮。',
+    light: '塔身轮廓灯 19:00 后开启，塔顶航空障碍灯闪烁',
+    view: { p: [-480, 220, -420], t: [-320, 120, -260] },
+  });
+  lmEmissives.push({ mat: steel, base: 0.04, night: 0.85 });
 }
 
 /* 江汉关：钟楼 + 穹顶（汉口沿江） */
 {
   const g = new THREE.Group();
-  const stone = new THREE.MeshStandardMaterial({ color: 0xd9cfae, roughness: 0.8 });
+  const stone = new THREE.MeshStandardMaterial({ color: 0xd9cfae, roughness: 0.8, emissive: 0xffca7a, emissiveIntensity: 0.0 });
   const base = new THREE.Mesh(new THREE.BoxGeometry(30, 16, 22), stone);
   base.position.y = 8; base.castShadow = true; g.add(base);
   const tower = new THREE.Mesh(new THREE.BoxGeometry(10, 34, 10), stone);
@@ -881,17 +1043,25 @@ function regLandmark(group, info) {
   const gy = Math.max(terrainHeight(55, 60), CITY_Y);
   g.position.set(55, gy, 60);
   landmarks.add(g);
-  regLandmark(g, { name: '江汉关大楼', dist: '汉口 · 沿江大道', h: Math.round(gy + 56), floors: 6, tags: ['百年海关', '全国重点文保', '地标'] });
+  regLandmark(g, {
+    name: '江汉关大楼', dist: '汉口 · 沿江大道', h: Math.round(gy + 56), floors: 6,
+    tags: ['百年海关', '全国重点文保', '地标'],
+    img: 'assets/img/lm-jianghanguan.jpg',
+    desc: '1924 年落成，是汉口开埠的历史见证，也是中国现存最早的三座海关大楼之一。钟楼整点钟声回荡江城，2015 年起作为江汉关博物馆开放，夜间暖金色泛光映照花岗岩立面。',
+    light: '暖金泛光 19:00–22:00 开启，整点钟声准点敲响',
+    view: { p: [-120, 90, 220], t: [55, 40, 60] },
+  });
+  lmEmissives.push({ mat: stone, base: 0.0, night: 0.6 });
 }
 
 /* 光谷星河：发光环雕塑（武昌·光谷广场） */
 {
   const g = new THREE.Group();
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(22, 2.2, 10, 48),
-    new THREE.MeshStandardMaterial({
-      color: 0x223a66, roughness: 0.3, metalness: 0.7,
-      emissive: 0x4fc3f7, emissiveIntensity: 0.9,
-    }));
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: 0x223a66, roughness: 0.3, metalness: 0.7,
+    emissive: 0x4fc3f7, emissiveIntensity: 0.9,
+  });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(22, 2.2, 10, 48), ringMat);
   ring.rotation.x = Math.PI / 12;
   ring.position.y = 26; g.add(ring);
   const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 26, 8),
@@ -900,7 +1070,15 @@ function regLandmark(group, info) {
   const gy = Math.max(terrainHeight(390, 320), CITY_Y);
   g.position.set(390, gy, 320);
   landmarks.add(g);
-  regLandmark(g, { name: '光谷 · 星河', dist: '武昌 · 光谷广场', h: Math.round(gy + 50), floors: 1, tags: ['光谷标志', '夜景灯光秀', '地标'] });
+  regLandmark(g, {
+    name: '光谷 · 星河', dist: '武昌 · 光谷广场', h: Math.round(gy + 50), floors: 1,
+    tags: ['光谷标志', '夜景灯光秀', '地标'],
+    img: 'assets/img/lm-guanggu.jpg',
+    desc: '光谷广场标志性雕塑，螺旋上升的光带象征“中国光谷”的光电子信息产业。入夜后环体流光溢彩，与周边楼宇灯光联动，是江城夜景的科技感担当。',
+    light: '光环流光灯效入夜常亮，整点上演 3 分钟灯光秀',
+    view: { p: [560, 120, 480], t: [390, 40, 320] },
+  });
+  lmEmissives.push({ mat: ringMat, base: 0.9, night: 2.4 });
 }
 
 /* 地标拾取 */
@@ -910,15 +1088,34 @@ function pickLandmark(ndc) {
   return hits.length ? hits[0].object.userData.lm : null;
 }
 function showLandmarkCard(lm) {
-  document.getElementById('bld-name').textContent = lm.name;
-  document.getElementById('bld-dist').textContent = lm.dist;
-  document.getElementById('bld-h').textContent = lm.h + ' m';
-  document.getElementById('bld-f').textContent = lm.floors > 1 ? lm.floors + ' F' : '—';
-  document.getElementById('bld-e').textContent = '—';
-  document.getElementById('bld-o').textContent = '—';
-  document.getElementById('bld-tags').innerHTML = lm.tags.map(t => `<span class="tg">${t}</span>`).join('');
-  document.getElementById('bld-card').style.display = 'block';
+  currentLm = lm;
+  document.getElementById('bld-card').style.display = 'none';
+  hlBox && (hlBox.visible = false);
+  document.getElementById('lm-name').textContent = lm.name;
+  document.getElementById('lm-dist').textContent = lm.dist + ' · 海拔约 ' + lm.h + ' m';
+  document.getElementById('lm-desc').textContent = lm.desc || '';
+  document.getElementById('lm-tags').innerHTML = lm.tags.map(t => `<span class="tg">${t}</span>`).join('');
+  const img = document.getElementById('lm-img');
+  if (lm.img) { img.src = lm.img; img.style.display = 'block'; }
+  else img.style.display = 'none';
+  updateLmLightRow(lm);
+  const card = document.getElementById('lm-card');
+  card.style.display = 'block';
+  card.classList.remove('pop'); void card.offsetWidth; card.classList.add('pop');
+  document.getElementById('lm-fly').onclick = () => {
+    if (lm.view) flyTo(lm.view.p, lm.view.t, 1600);
+  };
 }
+function updateLmLightRow(lm) {
+  const on = nightnessNow > 0.45;
+  document.getElementById('lm-lamp').classList.toggle('on', on);
+  document.getElementById('lm-light').textContent =
+    (on ? '💡 亮灯中 · ' : '☀️ 日间 · ') + (lm.light || '');
+}
+document.getElementById('lm-close').addEventListener('click', () => {
+  document.getElementById('lm-card').style.display = 'none';
+  currentLm = null;
+});
 
 /* ============================================================
  * 7. 树木（InstancedMesh 圆锥）与公园绿地
@@ -1090,6 +1287,7 @@ scene.add(cloudGroup);
  * ============================================================ */
 let timeOfDay = 12.5;   // 小时 0-24
 let autoCycle = true;
+let nightnessNow = 0;   // 0=白天 1=夜晚（供地标亮灯/灯光秀联动）
 const skyDay = new THREE.Color(0x87b5d9);
 const skyNight = new THREE.Color(0x070b18);
 const skyDusk = new THREE.Color(0xd98a4f);
@@ -1110,8 +1308,8 @@ function applyTimeOfDay() {
 
   // 光照强度
   sunLight.intensity = THREE.MathUtils.lerp(0.0, 2.6, dayness);
-  hemiLight.intensity = THREE.MathUtils.lerp(0.18, 0.9, dayness);
-  ambient.intensity = THREE.MathUtils.lerp(0.05, 0.12, dayness);
+  hemiLight.intensity = THREE.MathUtils.lerp(0.3, 0.9, dayness);
+  ambient.intensity = THREE.MathUtils.lerp(0.09, 0.12, dayness);
 
   // 黄昏染色
   const duskness = Math.max(0, 1 - Math.abs(sunEl) * 5) * (sunEl > -0.1 ? 1 : 0);
@@ -1126,6 +1324,17 @@ function applyTimeOfDay() {
 
   // 夜间元素
   const nightness = 1 - dayness;
+  nightnessNow = nightness;
+  // 地标夜景亮灯联动
+  for (const e of lmEmissives) e.mat.emissiveIntensity = e.base + (e.night - e.base) * nightness;
+  // 江面夜间微光 + 灯光秀强度
+  waterMat.emissive.setHex(0x123a5e);
+  waterMat.emissiveIntensity = nightness * 0.55;
+  riverLightGroup.userData.level = nightness;
+  riverLightGroup.visible = nightness > 0.08;
+  // 基线不透明度（动画循环未运行时也能呈现正确静态亮度）
+  for (const s of riverStreaks) s.mat.opacity = nightness * s.base * 0.8;
+  if (currentLm && document.getElementById('lm-card').style.display === 'block') updateLmLightRow(currentLm);
   starMat.opacity = nightness * 0.9;
   buildingMat.emissiveIntensity = nightness * 1.6;
   buildingMat.map = nightness > 0.5 ? winTexNight : winTexDay;
@@ -1591,6 +1800,18 @@ window.__forceSize = (w, h) => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
+};
+// 测试钩子：同步重渲染并导出画面 dataURL（供无头环境像素验证）
+window.__snap = () => {
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL('image/jpeg', 0.82);
+};
+// 测试钩子：同步设定相机（隐藏标签页 rAF 暂停时验证用）
+window.__setCam = (p, t) => {
+  camTween = null;
+  camera.position.set(p[0], p[1], p[2]);
+  controls.target.set(t[0], t[1], t[2]);
+  controls.update();
 };
 
 /* ============================================================
