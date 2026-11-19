@@ -336,6 +336,16 @@ H.makeChart(H.$('#ch-mode'), {
   });
   if (!feed.children.length) feed.innerHTML = '<div class="empty">今日暂无交通类警情</div>';
 }
+
+/* ---------- 跨页下钻：?road=R01&from=map → 直接弹出道路画像 ---------- */
+{
+  const qs = new URLSearchParams(location.search);
+  const rid = qs.get('road');
+  if (rid) {
+    const r = D.traffic.congestionIndex.find(x => x.id === rid || x.name === rid);
+    if (r) setTimeout(() => openRoadProfile(r), 350);
+  }
+}
 </script>
 </body>
 </html>

@@ -258,6 +258,28 @@
   #evt-card .go:hover { background: rgba(79,195,247,0.15); }
   #evt-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.6; font-size: 14px; }
   #evt-close:hover { opacity: 1; }
+
+  /* 业务穿透卡：路段 / 环境热区 → 业务系统 */
+  #biz-card {
+    position: fixed; bottom: 24px; right: 380px; width: 268px; z-index: 12;
+    background: var(--panel-bg); border: 1px solid #4fc3f7;
+    border-radius: 12px; backdrop-filter: blur(10px);
+    box-shadow: 0 0 24px rgba(79, 195, 247, 0.25);
+    color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 14px 16px; display: none; font-size: 12px;
+  }
+  #biz-card h4 { font-size: 14px; margin-bottom: 8px; letter-spacing: 1px; }
+  #biz-card .row { display: flex; justify-content: space-between; padding: 3px 0; opacity: 0.9; }
+  #biz-card .row .k { opacity: 0.6; }
+  #biz-card .row .v { font-family: "SF Mono", monospace; text-align: right; }
+  #biz-card .go { display: block; margin-top: 10px; text-align: center; font-size: 11px; padding: 6px 0; border-radius: 7px; border: 1px solid rgba(120,180,255,0.35); color: #4fc3f7; text-decoration: none; }
+  #biz-card .go:hover { background: rgba(79,195,247,0.15); }
+  #biz-close { position: absolute; top: 8px; right: 12px; cursor: pointer; opacity: 0.6; font-size: 14px; }
+  #biz-close:hover { opacity: 1; }
+  /* 建筑卡业务穿透链接行 */
+  #bld-card .biz-links { margin-top: 10px; display: flex; gap: 6px; }
+  #bld-card .biz-links a { flex: 1; text-align: center; font-size: 10px; padding: 5px 0; border-radius: 7px; border: 1px solid rgba(120,180,255,0.3); color: #a9bcd8; text-decoration: none; }
+  #bld-card .biz-links a:hover { border-color: var(--accent); color: #4fc3f7; background: rgba(79,195,247,0.12); }
 </style>
 
 
@@ -302,8 +324,18 @@
       <input type="range" id="ana-radius" min="60" max="420" step="10" value="150" style="width:100%;accent-color:#4fc3f7" />
     </div>
   </div>
+  <div class="sec">
+    <div class="sec-t">业务直达</div>
+    <div class="cruise-grid">
+      <button data-go="traffic.html">🚦 交通运行</button>
+      <button data-go="energy.html">⚡ 能源能耗</button>
+      <button data-go="emergency.html">🚨 应急指挥</button>
+      <button data-go="water.html">💧 水务监测</button>
+      <button data-go="data.html" style="grid-column:span 2">📊 数据档案中心</button>
+    </div>
+  </div>
   <div class="sec" style="font-size:11px;opacity:0.6;line-height:1.7">
-    💡 点击地标看讲解卡 · 夜晚长江上演灯光秀 · 图钉为实时事件
+    💡 点击地标看讲解卡 · 「🎆 灯光秀」按钮开启长江大桥变色与楼宇灯光 wave · 交通 / 环境主题下点击路段与热区可直达业务系统
   </div>
 </div>
 
@@ -317,6 +349,11 @@
   <div class="row"><span class="k">今日能耗</span><span class="v" id="bld-e">--</span></div>
   <div class="row"><span class="k">入驻率</span><span class="v" id="bld-o">--</span></div>
   <div class="tags" id="bld-tags"></div>
+  <div class="biz-links">
+    <a id="bld-link-energy" href="energy.html">⚡ 能耗分析</a>
+    <a id="bld-link-dist" href="data.html">📊 区域档案</a>
+    <a id="bld-link-emg" href="emergency.html">🚨 应急调度</a>
+  </div>
 </div>
 
 <!-- 地标讲解卡 -->
@@ -342,6 +379,14 @@
   <div class="row"><span class="k">当前状态</span><span class="v" id="evt-status">--</span></div>
   <div class="row"><span class="k">已持续</span><span class="v" id="evt-dur">--</span></div>
   <a class="go" href="emergency.html">前往应急指挥 →</a>
+</div>
+
+<!-- 业务穿透卡：点击路段 / 环境热区 → 直达业务系统 -->
+<div id="biz-card">
+  <span id="biz-close">✕</span>
+  <h4 id="biz-title">--</h4>
+  <div id="biz-rows"></div>
+  <a class="go" id="biz-link" href="#">前往业务系统 →</a>
 </div>
 
 <!-- 专题图层 dock（数智一张图核心入口，各主题独立色） -->
@@ -411,6 +456,7 @@ window.addEventListener('error', e => {
   <button class="ctrl-btn" id="btn-daynight">🌙 切换夜晚</button>
   <button class="ctrl-btn" id="btn-rotate">🔁 自动环绕</button>
   <button class="ctrl-btn" id="btn-traffic">🚗 车流: 开</button>
+  <button class="ctrl-btn" id="btn-lightshow">🎆 灯光秀: 关</button>
   <button class="ctrl-btn" id="btn-reset">🎯 重置视角</button>
 </div>
 
@@ -847,6 +893,8 @@ scene.add(roofMesh);
 /* ============================================================
  * 6.6 长江夜景灯光秀：桥面灯带 + 江面灯光倒影 + 游船光点
  * ============================================================ */
+/* 灯光秀总控（btn-lightshow 驱动）：大桥变色轮换 + 两岸楼宇灯光 wave 扫描 */
+const showFx = { on: false, strips: null, dots: null, ring: null, band: null, bandMat: null };
 const riverLightGroup = new THREE.Group();
 riverLightGroup.userData.level = 0;   // 0=白天熄灭 1=全亮（applyTimeOfDay 驱动）
 riverLightGroup.visible = false;
@@ -866,6 +914,7 @@ const riverBoats = [];
     riverLightGroup.add(strip);
   });
   riverStreaks.push({ mat: stripMat, base: 0.95, speed: 0.8, phase: 0 });
+  showFx.strips = stripMat;
   // 桥塔轮廓点光（冰蓝）
   const towerDotMat = new THREE.MeshBasicMaterial({
     color: 0x9fd8ff, transparent: true, opacity: 0,
@@ -879,6 +928,7 @@ const riverBoats = [];
     }
   });
   riverStreaks.push({ mat: towerDotMat, base: 0.85, speed: 1.6, phase: 2.1 });
+  showFx.dots = towerDotMat;
   // ② 江面灯光倒影：两岸楼宇灯火的细长拖影（呼吸闪烁）
   const streakPalette = [0xffc46a, 0xffc46a, 0x7ec8ff, 0xff9fd0, 0xfff2c8];
   for (let i = 0; i < 96; i++) {
@@ -937,6 +987,40 @@ const riverBoats = [];
     b.position.set(riverCenterX(z) + b.userData.off, WATER_LEVEL + 1.2, z);
     b.rotation.y = b.userData.speed > 0 ? 0 : Math.PI;
   }
+})();
+
+/* ---- 灯光秀进阶：大桥变色轮换 + 两岸楼宇灯光 wave 扫描带 + 窗户呼吸 ---- */
+{
+  // 扫描光带：竖直 Additive 平面，沿 x 轴 22s 一轮横扫全城（两端淡入淡出）
+  const bandMat = new THREE.MeshBasicMaterial({
+    color: 0x7ec8ff, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  });
+  const band = new THREE.Mesh(new THREE.PlaneGeometry(150, 330), bandMat);
+  band.position.set(-780, 165, 0);
+  band.visible = false;
+  scene.add(band);
+  showFx.band = band; showFx.bandMat = bandMat;
+}
+(function lightShowLoop() {
+  requestAnimationFrame(lightShowLoop);
+  if (!showFx.on) { if (showFx.band) showFx.band.visible = false; return; }
+  const n = nightnessNow;
+  showFx.band.visible = n > 0.05;
+  if (n <= 0.02) return;
+  const t = performance.now() / 1000;
+  // ① 长江大桥变色轮换：桥面灯带与桥塔点光异相彩虹流转
+  if (showFx.strips) showFx.strips.color.setHSL((t * 0.06) % 1, 0.75, 0.62);
+  if (showFx.dots) showFx.dots.color.setHSL((t * 0.06 + 0.33) % 1, 0.7, 0.68);
+  // ② 光谷星河光环同步变色（再错相位）
+  if (showFx.ring) showFx.ring.emissive.setHSL((t * 0.06 + 0.66) % 1, 0.8, 0.6);
+  // ③ 两岸楼宇灯光 wave：扫描带横扫全城
+  const k = (t % 22) / 22;
+  showFx.band.position.x = -780 + k * 1560;
+  showFx.bandMat.opacity = n * 0.16 * Math.sin(k * Math.PI);
+  showFx.bandMat.color.setHSL((t * 0.06 + 0.5) % 1, 0.6, 0.65);
+  // ④ 楼宇窗户整体呼吸（叠加在夜间基准亮度上）
+  buildingMat.emissiveIntensity = n * (1.6 + 0.55 * Math.sin(t * 2.2));
 })();
 
 /* ============================================================
@@ -1079,6 +1163,7 @@ window.__showLm = i => {
     view: { p: [560, 120, 480], t: [390, 40, 320] },
   });
   lmEmissives.push({ mat: ringMat, base: 0.9, night: 2.4 });
+  showFx.ring = ringMat;
 }
 
 /* 地标拾取 */
@@ -1336,7 +1421,7 @@ function applyTimeOfDay() {
   for (const s of riverStreaks) s.mat.opacity = nightness * s.base * 0.8;
   if (currentLm && document.getElementById('lm-card').style.display === 'block') updateLmLightRow(currentLm);
   starMat.opacity = nightness * 0.9;
-  buildingMat.emissiveIntensity = nightness * 1.6;
+  if (!showFx.on) buildingMat.emissiveIntensity = nightness * 1.6;   // 灯光秀期间由 lightShowLoop 驱动
   buildingMat.map = nightness > 0.5 ? winTexNight : winTexDay;
   lampMat.color.setHex(nightness > 0.4 ? 0xffd98a : 0x443c28);
   cloudGroup.visible = dayness > 0.15;
@@ -1369,6 +1454,30 @@ document.getElementById('btn-traffic').addEventListener('click', (e) => {
   trafficOn = !trafficOn;
   e.currentTarget.textContent = trafficOn ? '🚗 车流: 开' : '🚗 车流: 关';
   e.currentTarget.classList.toggle('active', !trafficOn);
+});
+document.getElementById('btn-lightshow').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  showFx.on = !showFx.on;
+  btn.textContent = showFx.on ? '🎆 灯光秀: 开' : '🎆 灯光秀: 关';
+  btn.classList.toggle('active', showFx.on);
+  if (showFx.on) {
+    // 灯光秀在夜间上演：白天则先切到夜晚，并飞抵长江大桥观赏位
+    if (nightnessNow < 0.5) {
+      timeOfDay = 21.5; autoCycle = false;
+      const dn = document.getElementById('btn-daynight');
+      dn.textContent = '☀️ 切换白天'; dn.classList.add('active');
+      document.getElementById('time-slider').value = timeOfDay;
+      document.getElementById('time-cur').textContent = '21:30';
+    }
+    flyTo([330, 110, 170], [Math.round(riverCenterX(0)), 16, 0], 1800);
+  } else {
+    // 复原灯光基色
+    if (showFx.strips) showFx.strips.color.setHex(0xffca6a);
+    if (showFx.dots) showFx.dots.color.setHex(0x9fd8ff);
+    if (showFx.ring) showFx.ring.emissive.setHex(0x4fc3f7);
+    if (showFx.band) showFx.band.visible = false;
+  }
+  applyTimeOfDay();
 });
 document.getElementById('btn-reset').addEventListener('click', () => {
   camera.position.copy(CAM_HOME);
@@ -1540,6 +1649,7 @@ const VIEWS = {
 };
 document.querySelectorAll('.cruise-grid button').forEach(b => {
   b.addEventListener('click', () => {
+    if (b.dataset.go) { location.href = b.dataset.go; return; }   // 业务直达
     const v = VIEWS[b.dataset.v];
     if (v) flyTo(v.p, v.t);
   });
@@ -1595,6 +1705,7 @@ function bldNameOf(id) {
          ' · T' + (1 + Math.floor(bldRand(id, 3) * 5));
 }
 function showBldCard(id, m) {
+  document.getElementById('biz-card').style.display = 'none';
   const pos = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
   m.decompose(pos, q, s);
   const dist = districtOf(pos.x, pos.z);
@@ -1613,6 +1724,8 @@ function showBldCard(id, m) {
   if (dist === 'cbd') tags.push('重点监测');
   tags.push('孪生体 #' + id);
   document.getElementById('bld-tags').innerHTML = tags.map(t => `<span class="tg">${t}</span>`).join('');
+  document.getElementById('bld-link-dist').href =
+    'data.html?district=' + encodeURIComponent(DIST_NAME[dist] || '汉阳居住区') + '&from=map';
   document.getElementById('bld-card').style.display = 'block';
   // 高亮框
   hlBox.position.copy(pos);
@@ -1637,7 +1750,13 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (pinHit) { showEvtCard(pinHit.object.userData.ev); return; }
   const lmHit = pickLandmark(pointerNDC);
   if (lmHit) { showLandmarkCard(lmHit); return; }
+  // 业务穿透：交通主题点路段 → 道路画像；环境主题点热区 → 区域档案（须比遮挡建筑更靠近镜头）
   const hit = pickBuilding(pointerNDC);
+  const bDist = hit ? hit.distance : Infinity;
+  const roadHit = pickRoadOverlay(pointerNDC);
+  if (roadHit && roadHit.dist < bDist) { showRoadBizCard(roadHit.road); return; }
+  const envHit = pickEnvDisc(pointerNDC);
+  if (envHit && envHit.dist < bDist) { showEnvBizCard(envHit.env); return; }
   if (hit) {
     const m = new THREE.Matrix4();
     buildings.getMatrixAt(hit.instanceId, m);
@@ -1839,6 +1958,7 @@ if (D) {
       color, transparent: true, opacity: 0.5, depthWrite: false,
     }));
     m.userData.baseOp = 0.5;
+    m.userData.road = c;              // 业务穿透：点击路段 → 道路画像
     if (line.axis === 'x') m.position.set((line.from + line.to) / 2, CITY_Y + 0.6, line.coord);
     else m.position.set(line.coord, CITY_Y + 0.6, (line.from + line.to) / 2);
     trafficLayer.add(m);
@@ -1981,6 +2101,66 @@ function showEvtCard(ev) {
 document.getElementById('evt-close').addEventListener('click', () => {
   document.getElementById('evt-card').style.display = 'none';
 });
+document.getElementById('biz-close').addEventListener('click', () => {
+  document.getElementById('biz-card').style.display = 'none';
+});
+
+/* ---- 业务穿透：地图上点击专题要素 → 直达业务系统 ---- */
+function pickRoadOverlay(ndc) {
+  if (curTheme !== 'traffic' || !trafficLayer.visible) return null;
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(trafficLayer.children, false);
+  return hits.length && hits[0].object.userData.road
+    ? { road: hits[0].object.userData.road, dist: hits[0].distance } : null;
+}
+function pickEnvDisc(ndc) {
+  if (curTheme !== 'env' || !envLayer.visible) return null;
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(envDiscs, false);
+  return hits.length ? { env: hits[0].object.userData.env, dist: hits[0].distance } : null;
+}
+function showBizCard(o) {
+  document.getElementById('bld-card').style.display = 'none';
+  hlBox.visible = false;
+  document.getElementById('biz-title').textContent = o.title;
+  document.getElementById('biz-rows').innerHTML = o.rows.map(([k, v]) =>
+    `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  const a = document.getElementById('biz-link');
+  a.href = o.link;
+  a.textContent = o.linkText || '前往业务系统 →';
+  document.getElementById('biz-card').style.display = 'block';
+}
+function showRoadBizCard(r) {
+  const col = r.index >= 2.1 ? '#f87171' : r.index >= 1.7 ? '#fbbf24' : '#34d399';
+  showBizCard({
+    title: '🛣 ' + r.name,
+    rows: [
+      ['道路等级', r.level + ' · ' + r.lanes + ' 车道'],
+      ['路段长度', r.length + ' km'],
+      ['当前车速', r.speed + ' km/h'],
+      ['当前流量', Number(r.flow).toLocaleString('zh-CN') + ' 辆/h'],
+      ['拥堵指数', `<span style="color:${col}">${r.index.toFixed(2)}（${r.status}）</span>`],
+    ],
+    link: 'traffic.html?road=' + r.id + '&from=map',
+    linkText: '查看 24h 道路画像 →',
+  });
+}
+function showEnvBizCard(e) {
+  const lvl = e.aqi <= 50 ? '优' : e.aqi <= 100 ? '良' : '轻度污染';
+  const col = e.aqi <= 50 ? '#34d399' : e.aqi <= 100 ? '#fbbf24' : '#f87171';
+  showBizCard({
+    title: '🌿 ' + e.name,
+    rows: [
+      ['空气质量', `<span style="color:${col}">${e.aqi} AQI（${lvl}）</span>`],
+      ['PM2.5', D.environment.pm25 + ' μg/m³'],
+      ['PM10', D.environment.pm10 + ' μg/m³'],
+      ['区域水质', D.environment.waterQuality],
+      ['噪声均值', D.environment.noise + ' dB'],
+    ],
+    link: 'data.html?district=' + encodeURIComponent(e.name) + '&from=map',
+    linkText: '查看该区数据档案 →',
+  });
+}
 // 图钉脉冲动画
 (function pinLoop() {
   requestAnimationFrame(pinLoop);
@@ -1997,6 +2177,7 @@ if (D) D.emergency.events.slice(0, 8).forEach(ev => addEventPin(ev));
 /* ---- 专题层 4：环境 AQI 热区 ---- */
 const envLayer = new THREE.Group();
 envLayer.visible = false;
+const envDiscs = [];   // 可拾取的环境热区圆盘（业务穿透）
 if (D) {
   const discGeo = new THREE.CircleGeometry(120, 40);
   discGeo.rotateX(-Math.PI / 2);
@@ -2009,6 +2190,8 @@ if (D) {
       color: col, transparent: true, opacity: 0.22, depthWrite: false,
     }));
     disc.userData.baseOp = 0.22;
+    disc.userData.env = { name: dNames[i], aqi, x, z };   // 业务穿透：点击热区 → 区域档案
+    envDiscs.push(disc);
     const gy = Math.max(terrainHeight(x, z), CITY_Y);
     disc.position.set(x, gy + 3, z);
     envLayer.add(disc);
@@ -2104,6 +2287,7 @@ function applyTheme(th) {
   themeTabs.forEach(b => b.classList.toggle('active', b.dataset.th === th));
   fadeLayer(trafficLayer, th === 'traffic');
   fadeLayer(envLayer, th === 'env');
+  document.getElementById('biz-card').style.display = 'none';   // 切换主题时收起业务卡
   animateTint(th === 'energy');
   // 相机巡航到主题视角
   const v = THEME_VIEWS[th];
@@ -2139,6 +2323,19 @@ if (window.CityLive) {
   });
   CityLive.start();
 }
+// 测试钩子：直接打开路段 / 环境业务卡（供自动化验证）
+window.__showRoad = (i) => {
+  const r = ((window.CITY_DATA || {}).traffic || {}).congestionIndex[i || 0];
+  if (!r) return null;
+  showRoadBizCard(r);
+  return r.name;
+};
+window.__showEnv = (i) => {
+  const d = envDiscs[i || 0];
+  if (!d) return null;
+  showEnvBizCard(d.userData.env);
+  return d.userData.env.name;
+};
 // 测试钩子：直接触发一起事件（供自动化验证）
 window.__fireEvent = ev => addEventPin(ev || { time: '12:00', type: '测试', level: 'warn', place: '测试事件', status: '已派单', duration: '5 分钟' });
 // 测试钩子：以 NDC 坐标拾取事件图钉（供自动化验证）
@@ -2190,6 +2387,24 @@ renderer.domElement.addEventListener('pointermove', e => {
   const lm = pickLandmark(ndc);
   if (lm) {
     hoverTip.textContent = '📍 ' + lm.name + '（点击查看地标档案）';
+    hoverTip.style.display = 'block';
+    hoverTip.style.left = e.clientX + 'px';
+    hoverTip.style.top = e.clientY + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+    return;
+  }
+  const roadH = pickRoadOverlay(ndc);
+  if (roadH) {
+    hoverTip.textContent = '🛣 ' + roadH.road.name + '（点击查看路段业务画像）';
+    hoverTip.style.display = 'block';
+    hoverTip.style.left = e.clientX + 'px';
+    hoverTip.style.top = e.clientY + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+    return;
+  }
+  const envH = pickEnvDisc(ndc);
+  if (envH) {
+    hoverTip.textContent = '🌿 ' + envH.env.name + ' AQI ' + envH.env.aqi + '（点击查看区域档案）';
     hoverTip.style.display = 'block';
     hoverTip.style.left = e.clientX + 'px';
     hoverTip.style.top = e.clientY + 'px';

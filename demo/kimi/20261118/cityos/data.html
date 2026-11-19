@@ -180,7 +180,8 @@ let page = 1, sortKey = 'id', sortDir = 1;
     H.$('#f-district').value = dist;
     const chip = H.$('#drill-chip');
     chip.style.display = '';
-    chip.textContent = `下钻自 ${qs.get('from') === 'overview' ? '态势总览' : '外部链接'} · ${dist} ✕`;
+    const fromMap = { overview: '态势总览', map: '数智一张图' };
+    chip.textContent = `下钻自 ${fromMap[qs.get('from')] || '外部链接'} · ${dist} ✕`;
     chip.style.cursor = 'pointer';
     chip.title = '点击清除下钻筛选';
     chip.addEventListener('click', () => {
