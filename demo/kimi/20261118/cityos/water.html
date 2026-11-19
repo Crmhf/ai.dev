@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>水务与环境 · 梅塔维尔 CityOS</title>
+<title>水务与环境 · 武汉 CityOS</title>
 <link rel="stylesheet" href="assets/css/main.css" />
 </head>
 <body>
@@ -107,7 +107,7 @@ H.makeChart(H.$('#ch-level'), {
   yAxis: { type: 'value', name: 'm', scale: true },
   series: [
     ...D.water.stations.map((s, i) => ({
-      name: ['上游站', '城区闸口', '的溪站'][i], type: 'line', smooth: true, symbol: 'none',
+      name: ['武汉关', '中华路', '龙王庙'][i], type: 'line', smooth: true, symbol: 'none',
       data: s.trend, lineStyle: { width: 2 },
     })),
     {

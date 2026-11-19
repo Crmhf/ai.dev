@@ -21,38 +21,38 @@
 
   /* ---------- 基础字典 ---------- */
   const DISTRICTS = [
-    { id: 'cbd',        name: '中央商务区', short: 'CBD',    area: 4.2,  pop: 18.6 },
-    { id: 'midtown',    name: '中城综合区', short: '中城',   area: 7.8,  pop: 32.4 },
-    { id: 'riverside',  name: '滨河居住区', short: '滨河',   area: 9.6,  pop: 41.2 },
-    { id: 'industrial', name: '南部工业区', short: '工业区', area: 12.3, pop: 15.8 },
-    { id: 'hillside',   name: '山岭生态区', short: '山岭',   area: 21.5, pop: 6.3  },
-    { id: 'harbor',     name: '临港物流区', short: '临港',   area: 6.1,  pop: 9.7  },
+    { id: 'cbd',        name: '汉口滨江商务区', short: '汉口',   area: 4.2,  pop: 18.6 },
+    { id: 'midtown',    name: '武昌综合区',     short: '武昌',   area: 7.8,  pop: 32.4 },
+    { id: 'riverside',  name: '汉阳居住区',     short: '汉阳',   area: 9.6,  pop: 41.2 },
+    { id: 'industrial', name: '青山工业区',     short: '青山',   area: 12.3, pop: 15.8 },
+    { id: 'hillside',   name: '东湖生态区',     short: '东湖',   area: 21.5, pop: 6.3  },
+    { id: 'harbor',     name: '阳逻港区',       short: '阳逻',   area: 6.1,  pop: 9.7  },
   ];
 
   const ROADS = [
-    { id: 'R01', name: '中央大道',   level: '主干路', lanes: 8, length: 6.8 },
-    { id: 'R02', name: '滨河东路',   level: '主干路', lanes: 6, length: 7.4 },
-    { id: 'R03', name: '滨河西路',   level: '主干路', lanes: 6, length: 7.1 },
-    { id: 'R04', name: '环城高架',   level: '快速路', lanes: 6, length: 18.9 },
-    { id: 'R05', name: '工业大道',   level: '主干路', lanes: 6, length: 5.6 },
-    { id: 'R06', name: '科创街',     level: '次干路', lanes: 4, length: 3.2 },
-    { id: 'R07', name: '临港快速路', level: '快速路', lanes: 6, length: 9.3 },
-    { id: 'R08', name: '山岭景观道', level: '次干路', lanes: 2, length: 11.4 },
-    { id: 'R09', name: '老城步行街', level: '支路',   lanes: 2, length: 1.6 },
-    { id: 'R10', name: '跨河大桥',   level: '快速路', lanes: 6, length: 0.9 },
+    { id: 'R01', name: '中山大道',     level: '主干路', lanes: 8, length: 6.8 },
+    { id: 'R02', name: '沿江大道',     level: '主干路', lanes: 6, length: 7.4 },
+    { id: 'R03', name: '临江大道',     level: '主干路', lanes: 6, length: 7.1 },
+    { id: 'R04', name: '武汉三环线',   level: '快速路', lanes: 6, length: 18.9 },
+    { id: 'R05', name: '冶金大道',     level: '主干路', lanes: 6, length: 5.6 },
+    { id: 'R06', name: '光谷创业街',   level: '次干路', lanes: 4, length: 3.2 },
+    { id: 'R07', name: '阳逻快速通道', level: '快速路', lanes: 6, length: 9.3 },
+    { id: 'R08', name: '东湖绿道',     level: '次干路', lanes: 2, length: 11.4 },
+    { id: 'R09', name: '江汉路步行街', level: '支路',   lanes: 2, length: 1.6 },
+    { id: 'R10', name: '武汉长江大桥', level: '快速路', lanes: 6, length: 0.9 },
   ];
 
   const BUILDINGS_TOP = [
-    { name: '云际中心',       district: 'cbd',        height: 328, floors: 72, usage: '办公/酒店' },
-    { name: '梅塔双子塔·东',  district: 'cbd',        height: 296, floors: 66, usage: '办公' },
-    { name: '梅塔双子塔·西',  district: 'cbd',        height: 296, floors: 66, usage: '办公' },
-    { name: '汇流金融大厦',   district: 'cbd',        height: 261, floors: 58, usage: '金融' },
-    { name: '中城寰宇广场',   district: 'midtown',    height: 218, floors: 49, usage: '商业综合体' },
-    { name: '滨河天际公寓',   district: 'riverside',  height: 186, floors: 55, usage: '住宅' },
-    { name: '科创之眼大厦',   district: 'midtown',    height: 172, floors: 40, usage: '研发办公' },
-    { name: '临港国际物流塔', district: 'harbor',     height: 158, floors: 36, usage: '物流总部' },
-    { name: '城市之门',       district: 'cbd',        height: 149, floors: 34, usage: '会展' },
-    { name: '山岭观景塔',     district: 'hillside',   height: 132, floors: 28, usage: '文旅' },
+    { name: '武汉绿地中心',   district: 'cbd',        height: 475, floors: 100, usage: '办公/酒店' },
+    { name: '武汉中心大厦',   district: 'cbd',        height: 438, floors: 88, usage: '办公' },
+    { name: '武汉天地·云廷',  district: 'cbd',        height: 376, floors: 73, usage: '办公/商业' },
+    { name: '民生银行大厦',   district: 'cbd',        height: 331, floors: 68, usage: '金融' },
+    { name: '楚河汉街·万达尊', district: 'midtown',   height: 218, floors: 49, usage: '商业综合体' },
+    { name: '汉阳滨江天玺',   district: 'riverside',  height: 186, floors: 55, usage: '住宅' },
+    { name: '光谷之星',       district: 'midtown',    height: 172, floors: 40, usage: '研发办公' },
+    { name: '阳逻港联检大楼', district: 'harbor',     height: 158, floors: 36, usage: '港口物流' },
+    { name: '武汉国际博览中心', district: 'cbd',      height: 149, floors: 34, usage: '会展' },
+    { name: '龟山电视塔',     district: 'hillside',   height: 221, floors: 28, usage: '文旅/发射' },
   ];
 
   const POI_TYPES = ['医院', '学校', '消防站', '派出所', '地铁站', '公交站', '公园', '体育馆'];
@@ -96,7 +96,7 @@
         { name: '1 号线', color: '#e64747', stations: 24, onTime: 99.2, crowd: rfloat(0.55, 0.9, 2) },
         { name: '2 号线', color: '#3f8cff', stations: 19, onTime: 98.7, crowd: rfloat(0.55, 0.9, 2) },
         { name: '3 号线', color: '#35c26e', stations: 16, onTime: 99.5, crowd: rfloat(0.4, 0.8, 2) },
-        { name: '滨河线', color: '#b15cff', stations: 11, onTime: 99.8, crowd: rfloat(0.3, 0.7, 2) },
+        { name: '4 号线', color: '#b15cff', stations: 11, onTime: 99.8, crowd: rfloat(0.3, 0.7, 2) },
       ],
       busRoutes: 86, busOnTime: rfloat(91, 95, 1), metroDaily: rint(88, 96), // 万人次
     },
@@ -210,9 +210,9 @@
   /* ---------- 水务与环境 ---------- */
   const water = {
     stations: [
-      { name: '梅江河 · 上游水文站', river: '梅江河', level: rfloat(2.8, 3.6, 2), warn: 5.50, trend: null },
-      { name: '梅江河 · 城区闸口站', river: '梅江河', level: rfloat(3.4, 4.2, 2), warn: 6.00, trend: null },
-      { name: '支流的溪 · 山岭入口站', river: '的溪', level: rfloat(1.6, 2.4, 2), warn: 4.00, trend: null },
+      { name: '长江 · 汉口武汉关水文站', river: '长江', level: rfloat(2.8, 3.6, 2), warn: 5.50, trend: null },
+      { name: '长江 · 武昌中华路闸口站', river: '长江', level: rfloat(3.4, 4.2, 2), warn: 6.00, trend: null },
+      { name: '汉江 · 龙王庙入口站', river: '汉江', level: rfloat(1.6, 2.4, 2), warn: 4.00, trend: null },
     ],
     rain24h: Array.from({ length: 24 }, (_, h) => {
       const peak = Math.exp(-Math.pow(h - 21, 2) / 6);
@@ -226,18 +226,18 @@
       { name: '浊度', value: rfloat(2, 6, 1), std: '≤10 NTU', pct: 0 },
     ],
     pumps: [
-      { name: '滨河 1# 泵站', flow: rint(60, 95), status: '运行' },
-      { name: '滨河 2# 泵站', flow: rint(50, 90), status: '运行' },
-      { name: '工业雨水泵站', flow: rint(30, 70), status: '运行' },
-      { name: '临港排涝泵站', flow: 0, status: '待机' },
-      { name: '老城合流泵站', flow: rint(20, 60), status: '运行' },
-      { name: '山岭补水泵站', flow: 0, status: '检修' },
+      { name: '沿江 1# 泵站', flow: rint(60, 95), status: '运行' },
+      { name: '沿江 2# 泵站', flow: rint(50, 90), status: '运行' },
+      { name: '青山工业雨水泵站', flow: rint(30, 70), status: '运行' },
+      { name: '阳逻排涝泵站', flow: 0, status: '待机' },
+      { name: '江汉路合流泵站', flow: rint(20, 60), status: '运行' },
+      { name: '东湖补水泵站', flow: 0, status: '检修' },
     ],
     floodSpots: [
-      { place: '滨河东路下穿通道', risk: '高', depth: rint(8, 22) },
-      { place: '老城步行街南口', risk: '中', depth: rint(4, 10) },
-      { place: '工业大道辅道低洼段', risk: '中', depth: rint(3, 9) },
-      { place: '临港物流园西区', risk: '低', depth: rint(0, 4) },
+      { place: '沿江大道下穿通道', risk: '高', depth: rint(8, 22) },
+      { place: '江汉路步行街南口', risk: '中', depth: rint(4, 10) },
+      { place: '冶金大道辅道低洼段', risk: '中', depth: rint(3, 9) },
+      { place: '阳逻港西区', risk: '低', depth: rint(0, 4) },
     ],
   };
   water.stations.forEach(s => {

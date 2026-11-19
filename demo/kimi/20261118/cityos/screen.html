@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>可视化大屏 · 梅塔维尔 CityOS</title>
+<title>可视化大屏 · 武汉 CityOS</title>
 <link rel="stylesheet" href="assets/css/main.css" />
 <style>
   /* ---------- 大屏专用视觉 ---------- */
@@ -145,7 +145,7 @@
       <span id="w-info">--</span>
       <a class="btn sm back" href="index.html">← 管理端</a>
     </div>
-    <h1>梅塔维尔城市运行指挥中心</h1>
+    <h1>武汉城市运行指挥中心</h1>
     <div class="side r"><span id="s-date">--</span><span id="s-clock" style="color:var(--accent)">--:--:--</span></div>
   </div>
 
@@ -223,12 +223,12 @@
             </g>
             <!-- 城区标注 -->
             <g font-size="13" fill="#a9bcd8" text-anchor="middle" letter-spacing="2">
-              <text x="450" y="105" fill="#e8f1ff" font-weight="600">中央商务区</text>
-              <text x="150" y="230">中城综合区</text>
-              <text x="760" y="230">滨河居住区</text>
-              <text x="150" y="430">南部工业区</text>
-              <text x="680" y="505">山岭生态区</text>
-              <text x="790" y="430">临港物流区</text>
+              <text x="450" y="105" fill="#e8f1ff" font-weight="600">汉口滨江商务区</text>
+              <text x="150" y="230">汉阳居住区</text>
+              <text x="760" y="230">武昌综合区</text>
+              <text x="150" y="430">青山工业区</text>
+              <text x="680" y="505">东湖生态区</text>
+              <text x="790" y="430">阳逻港区</text>
             </g>
             <!-- CBD 楼群剪影 -->
             <g fill="rgba(126,224,255,0.16)" stroke="rgba(126,224,255,0.4)" stroke-width="1">
@@ -441,7 +441,7 @@ setInterval(() => {
 
 /* ---------- 地图 POI 脉冲点 ---------- */
 const poiLayer = document.getElementById('poi-layer');
-[[455, 190, 'CBD'], [200, 250, '中城'], [700, 250, '滨河'], [200, 400, '工业区'], [680, 470, '山岭'], [760, 400, '临港']]
+[[455, 190, '汉口'], [200, 250, '汉阳'], [700, 250, '武昌'], [200, 400, '青山'], [680, 470, '东湖'], [760, 400, '阳逻']]
   .forEach(([x, y, name]) => {
     const g = document.createElementNS(SVGNS, 'g');
     const ring = document.createElementNS(SVGNS, 'circle');
@@ -473,11 +473,11 @@ function flashOnMap(level) {
 {
   const news = [
     '市气象台发布黄色预警：今夜到明晨有短时强降水',
-    '环城高架晚高峰预计 17:40 开始，请提前规划路线',
-    '云际中心荣获年度绿色建筑三星认证',
+    '武汉长江大桥晚高峰预计 17:40 开始，请提前规划路线',
+    '武汉绿地中心荣获年度绿色建筑三星认证',
     '地铁 2 号线本周末夜间停运检修（23:30 - 次日 5:00）',
     '全市充电桩覆盖率已达 76%，年底前完成 90% 目标',
-    '滨河公园秋季灯光秀每晚 19:30 准时开启',
+    '黄鹤楼公园夜游灯光秀每晚 19:30 准时开启',
   ];
   const track = document.getElementById('mq-track');
   track.innerHTML = [...news, ...news].map(n => `<span>◈ ${n}</span>`).join('');

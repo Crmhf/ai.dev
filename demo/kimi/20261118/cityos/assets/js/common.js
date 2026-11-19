@@ -44,7 +44,7 @@
     if (sb) {
       let html = `
         <div class="brand">
-          <div class="name">梅塔维尔 <em>CityOS</em></div>
+          <div class="name">武汉 <em>CityOS</em></div>
           <div class="sub">City Operation System</div>
           <button class="sb-toggle" id="sb-toggle" title="收起 / 展开侧栏">⇤</button>
         </div><nav>`;
